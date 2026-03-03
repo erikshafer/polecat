@@ -1,4 +1,3 @@
-using Microsoft.Data.SqlClient;
 using Polecat.Logging;
 using Polecat.Tests.Harness;
 using Shouldly;
@@ -157,9 +156,9 @@ public class session_logging_tests : IntegrationContext
         public int FailureCount { get; private set; }
         public int SavedChangesCount { get; private set; }
 
-        public void OnBeforeExecute(SqlCommand command) => BeforeExecuteCount++;
-        public void LogSuccess(SqlCommand command) => SuccessCount++;
-        public void LogFailure(SqlCommand command, Exception ex) => FailureCount++;
+        public void OnBeforeExecute(string commandText) => BeforeExecuteCount++;
+        public void LogSuccess(string commandText) => SuccessCount++;
+        public void LogFailure(string commandText, Exception ex) => FailureCount++;
         public void RecordSavedChanges(IDocumentSession session) => SavedChangesCount++;
     }
 }

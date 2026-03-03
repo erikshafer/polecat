@@ -1,3 +1,5 @@
+using Weasel.SqlServer;
+
 namespace Polecat.Linq.SqlGeneration;
 
 /// <summary>
@@ -14,7 +16,7 @@ internal class Statement
     public bool IsExistsWrapper { get; set; }
     public bool IsDistinct { get; set; }
 
-    public void Apply(CommandBuilder builder)
+    public void Apply(ICommandBuilder builder)
     {
         if (IsExistsWrapper)
         {
@@ -27,7 +29,7 @@ internal class Statement
         ApplyInner(builder);
     }
 
-    private void ApplyInner(CommandBuilder builder)
+    private void ApplyInner(ICommandBuilder builder)
     {
         builder.Append("SELECT ");
 

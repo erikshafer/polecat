@@ -104,12 +104,12 @@ internal class QuerySession : IQuerySession
         cmd.Parameters.AddWithValue("@id", id);
         cmd.Parameters.AddWithValue("@tenant_id", TenantId);
 
-        Logger.OnBeforeExecute(cmd);
+        Logger.OnBeforeExecute(cmd.CommandText);
         try
         {
             await using var reader = await cmd.ExecuteReaderAsync(token);
             RequestCount++;
-            Logger.LogSuccess(cmd);
+            Logger.LogSuccess(cmd.CommandText);
 
             if (await reader.ReadAsync(token))
             {
@@ -124,7 +124,7 @@ internal class QuerySession : IQuerySession
         }
         catch (Exception ex)
         {
-            Logger.LogFailure(cmd, ex);
+            Logger.LogFailure(cmd.CommandText, ex);
             throw;
         }
     }
@@ -166,13 +166,13 @@ internal class QuerySession : IQuerySession
         cmd.CommandText = $"{provider.SelectSql} WHERE id IN ({string.Join(", ", paramNames)}) AND tenant_id = @tenant_id{softDeleteFilter};";
         cmd.Parameters.AddWithValue("@tenant_id", TenantId);
 
-        Logger.OnBeforeExecute(cmd);
+        Logger.OnBeforeExecute(cmd.CommandText);
         try
         {
             var results = new List<T>();
             await using var reader = await cmd.ExecuteReaderAsync(token);
             RequestCount++;
-            Logger.LogSuccess(cmd);
+            Logger.LogSuccess(cmd.CommandText);
 
             while (await reader.ReadAsync(token))
             {
@@ -187,7 +187,7 @@ internal class QuerySession : IQuerySession
         }
         catch (Exception ex)
         {
-            Logger.LogFailure(cmd, ex);
+            Logger.LogFailure(cmd.CommandText, ex);
             throw;
         }
     }
@@ -237,17 +237,17 @@ internal class QuerySession : IQuerySession
         cmd.Parameters.AddWithValue("@id", id);
         cmd.Parameters.AddWithValue("@tenant_id", TenantId);
 
-        Logger.OnBeforeExecute(cmd);
+        Logger.OnBeforeExecute(cmd.CommandText);
         try
         {
             var result = await cmd.ExecuteScalarAsync(token);
             RequestCount++;
-            Logger.LogSuccess(cmd);
+            Logger.LogSuccess(cmd.CommandText);
             return result is string json ? json : null;
         }
         catch (Exception ex)
         {
-            Logger.LogFailure(cmd, ex);
+            Logger.LogFailure(cmd.CommandText, ex);
             throw;
         }
     }
@@ -267,7 +267,7 @@ internal class QuerySession : IQuerySession
     ///     Syncs version/revision properties from the DB columns to the document object.
     ///     SelectSql column layout: id[0], data[1], version[2], last_modified[3], dotnet_type[4], tenant_id[5], guid_version[6]?
     /// </summary>
-    internal static void SyncVersionProperties<T>(T doc, SqlDataReader reader, DocumentProvider provider) where T : class
+    internal static void SyncVersionProperties<T>(T doc, System.Data.Common.DbDataReader reader, DocumentProvider provider) where T : class
     {
         if (provider.Mapping.UseNumericRevisions && doc is IRevisioned revisioned)
         {
@@ -284,7 +284,7 @@ internal class QuerySession : IQuerySession
     ///     Syncs tenant_id from the DB column to ITenanted documents.
     ///     tenant_id is at column index 5 in SelectSql.
     /// </summary>
-    internal static void SyncTenantId<T>(T doc, SqlDataReader reader) where T : class
+    internal static void SyncTenantId<T>(T doc, System.Data.Common.DbDataReader reader) where T : class
     {
         if (doc is ITenanted tenanted)
         {

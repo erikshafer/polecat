@@ -1,3 +1,5 @@
+using Weasel.SqlServer;
+
 namespace Polecat.Linq.SqlGeneration;
 
 /// <summary>
@@ -12,7 +14,7 @@ internal class LiteralSqlFragment : ISqlFragment
         _sql = sql;
     }
 
-    public void Apply(CommandBuilder builder)
+    public void Apply(ICommandBuilder builder)
     {
         builder.Append(_sql);
     }

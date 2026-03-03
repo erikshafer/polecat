@@ -1,5 +1,6 @@
-using Microsoft.Data.SqlClient;
+using System.Data.Common;
 using Polecat.Events;
+using Weasel.SqlServer;
 
 namespace Polecat.Internal.Operations;
 
@@ -28,21 +29,19 @@ internal class UpdateSnapshotOperation : IStorageOperation
     public Type DocumentType => typeof(object);
     public OperationRole Role => OperationRole.Update;
 
-    public void ConfigureCommand(SqlCommand command)
+    public void ConfigureCommand(ICommandBuilder builder)
     {
-        command.CommandText = $"""
+        builder.Append($"""
             UPDATE {_events.StreamsTableName}
             SET snapshot = @snapshot, snapshot_version = @snapshot_version
             WHERE id = @id AND tenant_id = @tenant_id;
-            """;
-        command.Parameters.AddWithValue("@snapshot", _snapshotJson);
-        command.Parameters.AddWithValue("@snapshot_version", _snapshotVersion);
-        command.Parameters.AddWithValue("@id", _streamId);
-        command.Parameters.AddWithValue("@tenant_id", _tenantId);
+            """);
+        builder.AddParameters(new Dictionary<string, object?>
+        {
+            ["snapshot"] = _snapshotJson, ["snapshot_version"] = _snapshotVersion,
+            ["id"] = _streamId, ["tenant_id"] = _tenantId
+        });
     }
 
-    public async Task PostprocessAsync(SqlCommand command, CancellationToken token)
-    {
-        await command.ExecuteNonQueryAsync(token);
-    }
+    public Task PostprocessAsync(DbDataReader reader, CancellationToken token) => Task.CompletedTask;
 }

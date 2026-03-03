@@ -1,5 +1,6 @@
-using Microsoft.Data.SqlClient;
+using System.Data.Common;
 using Polecat.Events;
+using Weasel.SqlServer;
 
 namespace Polecat.Internal.Operations;
 
@@ -19,20 +20,16 @@ internal class UnArchiveStreamOperation : IStorageOperation
     public Type DocumentType => typeof(object);
     public OperationRole Role => OperationRole.Update;
 
-    public void ConfigureCommand(SqlCommand command)
+    public void ConfigureCommand(ICommandBuilder builder)
     {
-        command.CommandText = $"""
+        builder.Append($"""
             UPDATE {_events.StreamsTableName} SET is_archived = 0
             WHERE id = @id AND tenant_id = @tenant_id;
             UPDATE {_events.EventsTableName} SET is_archived = 0
             WHERE stream_id = @id AND tenant_id = @tenant_id;
-            """;
-        command.Parameters.AddWithValue("@id", _streamId);
-        command.Parameters.AddWithValue("@tenant_id", _tenantId);
+            """);
+        builder.AddParameters(new Dictionary<string, object?> { ["id"] = _streamId, ["tenant_id"] = _tenantId });
     }
 
-    public async Task PostprocessAsync(SqlCommand command, CancellationToken token)
-    {
-        await command.ExecuteNonQueryAsync(token);
-    }
+    public Task PostprocessAsync(DbDataReader reader, CancellationToken token) => Task.CompletedTask;
 }

@@ -2,6 +2,7 @@ using System.Collections;
 using System.Linq.Expressions;
 using Polecat.Linq.Members;
 using Polecat.Linq.SqlGeneration;
+using Weasel.SqlServer;
 
 namespace Polecat.Linq.Parsing.Methods;
 
@@ -68,7 +69,7 @@ internal class InFilter : ISqlFragment
         _values = values;
     }
 
-    public void Apply(CommandBuilder builder)
+    public void Apply(ICommandBuilder builder)
     {
         if (_values.Count == 0)
         {

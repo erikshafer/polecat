@@ -3,6 +3,7 @@ using System.Linq.Expressions;
 using System.Reflection;
 using Polecat.Linq.Members;
 using Polecat.Linq.SqlGeneration;
+using Weasel.SqlServer;
 
 namespace Polecat.Linq.Parsing.Methods;
 
@@ -205,7 +206,7 @@ internal class OpenjsonContainsFilter : ISqlFragment
         _value = value;
     }
 
-    public void Apply(CommandBuilder builder)
+    public void Apply(ICommandBuilder builder)
     {
         builder.AppendParameter(_value);
         builder.Append($" IN (SELECT [value] FROM OPENJSON(data, '{_jsonPath}'))");

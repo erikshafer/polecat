@@ -1,14 +1,14 @@
 using System.Linq.Expressions;
 using System.Text.Json;
 using Polecat.Internal;
-using Polecat.Linq.SqlGeneration;
+using Weasel.SqlServer;
 using Polecat.Serialization;
 
 namespace Polecat.Patching;
 
 internal class PatchExpression<T> : IPatchExpression<T>
 {
-    private readonly List<Action<CommandBuilder>> _actions = new();
+    private readonly List<Action<ICommandBuilder>> _actions = new();
     private readonly ISerializer _serializer;
     private readonly JsonNamingPolicy? _namingPolicy;
 

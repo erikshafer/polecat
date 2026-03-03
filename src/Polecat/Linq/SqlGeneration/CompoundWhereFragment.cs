@@ -1,3 +1,5 @@
+using Weasel.SqlServer;
+
 namespace Polecat.Linq.SqlGeneration;
 
 /// <summary>
@@ -16,7 +18,7 @@ internal class CompoundWhereFragment : ISqlFragment
         _right = right;
     }
 
-    public void Apply(CommandBuilder builder)
+    public void Apply(ICommandBuilder builder)
     {
         builder.Append("(");
         _left.Apply(builder);

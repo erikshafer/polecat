@@ -1,6 +1,7 @@
-using Microsoft.Data.SqlClient;
+using System.Data.Common;
 using Polecat.Linq.SqlGeneration;
 using Polecat.Serialization;
+using Weasel.SqlServer;
 
 namespace Polecat.Internal.Batching;
 
@@ -18,13 +19,13 @@ internal class QueryListBatchItem<T> : IBatchQueryItem where T : class
 
     public Task<IReadOnlyList<T>> Result => _tcs.Task;
 
-    public void WriteSql(CommandBuilder builder)
+    public void WriteSql(ICommandBuilder builder)
     {
         _statement.Apply(builder);
         builder.Append(";\n");
     }
 
-    public async Task ReadResultSetAsync(SqlDataReader reader, CancellationToken token)
+    public async Task ReadResultSetAsync(DbDataReader reader, CancellationToken token)
     {
         var results = new List<T>();
         while (await reader.ReadAsync(token))
@@ -51,13 +52,13 @@ internal class QueryCountBatchItem : IBatchQueryItem
 
     public Task<int> Result => _tcs.Task;
 
-    public void WriteSql(CommandBuilder builder)
+    public void WriteSql(ICommandBuilder builder)
     {
         _statement.Apply(builder);
         builder.Append(";\n");
     }
 
-    public async Task ReadResultSetAsync(SqlDataReader reader, CancellationToken token)
+    public async Task ReadResultSetAsync(DbDataReader reader, CancellationToken token)
     {
         if (await reader.ReadAsync(token))
         {
@@ -85,13 +86,13 @@ internal class QueryAnyBatchItem : IBatchQueryItem
 
     public Task<bool> Result => _tcs.Task;
 
-    public void WriteSql(CommandBuilder builder)
+    public void WriteSql(ICommandBuilder builder)
     {
         _statement.Apply(builder);
         builder.Append(";\n");
     }
 
-    public async Task ReadResultSetAsync(SqlDataReader reader, CancellationToken token)
+    public async Task ReadResultSetAsync(DbDataReader reader, CancellationToken token)
     {
         if (await reader.ReadAsync(token))
         {
@@ -119,13 +120,13 @@ internal class QueryFirstOrDefaultBatchItem<T> : IBatchQueryItem where T : class
 
     public Task<T?> Result => _tcs.Task;
 
-    public void WriteSql(CommandBuilder builder)
+    public void WriteSql(ICommandBuilder builder)
     {
         _statement.Apply(builder);
         builder.Append(";\n");
     }
 
-    public async Task ReadResultSetAsync(SqlDataReader reader, CancellationToken token)
+    public async Task ReadResultSetAsync(DbDataReader reader, CancellationToken token)
     {
         if (await reader.ReadAsync(token))
         {

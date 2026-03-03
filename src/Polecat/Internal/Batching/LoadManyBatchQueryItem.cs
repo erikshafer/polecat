@@ -1,7 +1,7 @@
-using Microsoft.Data.SqlClient;
-using Polecat.Linq.SqlGeneration;
+using System.Data.Common;
 using Polecat.Metadata;
 using Polecat.Serialization;
+using Weasel.SqlServer;
 
 namespace Polecat.Internal.Batching;
 
@@ -23,7 +23,7 @@ internal class LoadManyBatchQueryItem<T> : IBatchQueryItem where T : class
 
     public Task<IReadOnlyList<T>> Result => _tcs.Task;
 
-    public void WriteSql(CommandBuilder builder)
+    public void WriteSql(ICommandBuilder builder)
     {
         if (_ids.Length == 0)
         {
@@ -31,22 +31,24 @@ internal class LoadManyBatchQueryItem<T> : IBatchQueryItem where T : class
             return;
         }
 
-        var idParams = new string[_ids.Length];
-        for (var i = 0; i < _ids.Length; i++)
-        {
-            idParams[i] = builder.AddParameter(_ids[i]);
-        }
-
-        var tenantParam = builder.AddParameter(_tenantId);
-
         var softDeleteFilter = _provider.Mapping.DeleteStyle == DeleteStyle.SoftDelete
             ? " AND is_deleted = 0"
             : "";
 
-        builder.Append($"{_provider.SelectSql} WHERE id IN ({string.Join(", ", idParams)}) AND tenant_id = {tenantParam}{softDeleteFilter};\n");
+        builder.Append($"{_provider.SelectSql} WHERE id IN (");
+        for (var i = 0; i < _ids.Length; i++)
+        {
+            if (i > 0) builder.Append(", ");
+            builder.AppendParameter(_ids[i]);
+        }
+
+        builder.Append(") AND tenant_id = ");
+        builder.AppendParameter(_tenantId);
+        builder.Append(softDeleteFilter);
+        builder.Append(";\n");
     }
 
-    public async Task ReadResultSetAsync(SqlDataReader reader, CancellationToken token)
+    public async Task ReadResultSetAsync(DbDataReader reader, CancellationToken token)
     {
         var results = new List<T>();
         while (await reader.ReadAsync(token))

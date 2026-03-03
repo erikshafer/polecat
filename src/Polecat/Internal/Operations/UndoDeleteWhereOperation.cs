@@ -1,6 +1,7 @@
-using Microsoft.Data.SqlClient;
+using System.Data.Common;
 using Polecat.Linq.SqlGeneration;
 using Polecat.Storage;
+using Weasel.SqlServer;
 
 namespace Polecat.Internal.Operations;
 
@@ -20,19 +21,15 @@ internal class UndoDeleteWhereOperation : IStorageOperation
     public Type DocumentType => _mapping.DocumentType;
     public OperationRole Role => OperationRole.Update;
 
-    public void ConfigureCommand(SqlCommand command)
+    public void ConfigureCommand(ICommandBuilder builder)
     {
-        var builder = new CommandBuilder();
-        builder.Append($"UPDATE {_mapping.QualifiedTableName} SET is_deleted = 0, deleted_at = NULL WHERE tenant_id = ");
+        builder.Append(
+            $"UPDATE {_mapping.QualifiedTableName} SET is_deleted = 0, deleted_at = NULL WHERE tenant_id = ");
         builder.AppendParameter(_tenantId);
         builder.Append(" AND is_deleted = 1 AND ");
         _whereFragment.Apply(builder);
         builder.Append(";");
-        builder.ApplyTo(command);
     }
 
-    public async Task PostprocessAsync(SqlCommand command, CancellationToken token)
-    {
-        await command.ExecuteNonQueryAsync(token);
-    }
+    public Task PostprocessAsync(DbDataReader reader, CancellationToken token) => Task.CompletedTask;
 }

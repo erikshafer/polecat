@@ -111,8 +111,11 @@ public class projection_progression_tests : IntegrationContext
     private async Task ExecuteOperationAsync(Internal.IStorageOperation op)
     {
         await using var conn = await OpenConnectionAsync();
-        await using var cmd = conn.CreateCommand();
-        op.ConfigureCommand(cmd);
-        await op.PostprocessAsync(cmd, CancellationToken.None);
+        await using var batch = new Microsoft.Data.SqlClient.SqlBatch(conn);
+        var builder = new Weasel.SqlServer.BatchBuilder(batch);
+        op.ConfigureCommand(builder);
+        builder.Compile();
+        await using var reader = await batch.ExecuteReaderAsync(CancellationToken.None);
+        await op.PostprocessAsync(reader, CancellationToken.None);
     }
 }

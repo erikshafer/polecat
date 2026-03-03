@@ -1,6 +1,8 @@
+using System.Data.Common;
 using JasperFx.Events;
 using Microsoft.Data.SqlClient;
 using Polecat.Internal;
+using Weasel.SqlServer;
 
 namespace Polecat.Projections.Flattened;
 
@@ -25,20 +27,17 @@ internal class FlatTableSqlOperation : IStorageOperation
     public Type DocumentType => typeof(object);
     public OperationRole Role { get; }
 
-    public void ConfigureCommand(SqlCommand command)
+    public void ConfigureCommand(ICommandBuilder builder)
     {
-        command.CommandText = _sql;
+        builder.Append(_sql);
         for (var i = 0; i < _parameterSetters.Length; i++)
         {
-            var param = command.CreateParameter();
-            param.ParameterName = $"@p{i}";
+            var param = new SqlParameter { ParameterName = $"p{i}" };
             _parameterSetters[i].SetValue(param, _source);
-            command.Parameters.Add(param);
+            // Use AddParameters with a dictionary to add the pre-configured parameter value
+            builder.AddParameters(new Dictionary<string, object?> { [$"p{i}"] = param.Value });
         }
     }
 
-    public async Task PostprocessAsync(SqlCommand command, CancellationToken token)
-    {
-        await command.ExecuteNonQueryAsync(token);
-    }
+    public Task PostprocessAsync(DbDataReader reader, CancellationToken token) => Task.CompletedTask;
 }

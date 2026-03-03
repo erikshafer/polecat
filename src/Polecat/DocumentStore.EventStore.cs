@@ -95,6 +95,22 @@ public partial class DocumentStore : IEventStore<IDocumentSession, IQuerySession
         return batch;
     }
 
+    IReadOnlyEventStore IEventStore.OpenReadOnlyEventStore()
+    {
+        var session = QuerySession();
+        return (IReadOnlyEventStore)session.Events;
+    }
+
+    Task IEventStore.CompactStreamAsync(Guid streamId, CancellationToken token)
+    {
+        throw new NotSupportedException("Stream compaction is not yet supported in Polecat.");
+    }
+
+    Task IEventStore.CompactStreamAsync(string streamKey, CancellationToken token)
+    {
+        throw new NotSupportedException("Stream compaction is not yet supported in Polecat.");
+    }
+
     async Task<EventStoreUsage?> IEventStore.TryCreateUsage(CancellationToken token)
     {
         var usage = new EventStoreUsage(Database.DatabaseUri, this);

@@ -1,6 +1,7 @@
 using System.Linq.Expressions;
 using Polecat.Linq.Members;
 using Polecat.Linq.SqlGeneration;
+using Weasel.SqlServer;
 
 namespace Polecat.Linq.Parsing.Methods;
 
@@ -49,7 +50,7 @@ internal class CaseInsensitiveEqualsFilter : ISqlFragment
         _value = value;
     }
 
-    public void Apply(CommandBuilder builder)
+    public void Apply(ICommandBuilder builder)
     {
         builder.Append(_locator);
         builder.Append(" COLLATE Latin1_General_CI_AS = ");

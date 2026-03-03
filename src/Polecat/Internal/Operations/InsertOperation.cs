@@ -1,8 +1,10 @@
+using System.Data.Common;
 using JasperFx;
 using Microsoft.Data.SqlClient;
 using Polecat.Exceptions;
 using Polecat.Metadata;
 using Polecat.Storage;
+using Weasel.SqlServer;
 
 namespace Polecat.Internal.Operations;
 
@@ -30,62 +32,53 @@ internal class InsertOperation : IStorageOperation
     public object? DocumentId => _id;
     public object Document => _document;
 
-    public void ConfigureCommand(SqlCommand command)
+    public void ConfigureCommand(ICommandBuilder builder)
     {
         if (_mapping.UseOptimisticConcurrency)
         {
-            command.CommandText = $"""
+            builder.Append($"""
                 INSERT INTO {_mapping.QualifiedTableName} (id, data, version, guid_version, last_modified, dotnet_type, tenant_id)
                 OUTPUT inserted.version, inserted.guid_version
                 VALUES (@id, @data, 1, @new_guid_version, SYSDATETIMEOFFSET(), @dotnet_type, @tenant_id);
-                """;
+                """);
 
-            AddBaseParameters(command);
-            command.Parameters.AddWithValue("@new_guid_version", _newGuidVersion);
+            builder.AddParameters(new Dictionary<string, object?>
+            {
+                ["id"] = _id, ["data"] = _json, ["new_guid_version"] = _newGuidVersion,
+                ["dotnet_type"] = _mapping.DotNetTypeName, ["tenant_id"] = _tenantId
+            });
         }
         else
         {
-            command.CommandText = $"""
+            builder.Append($"""
                 INSERT INTO {_mapping.QualifiedTableName} (id, data, version, last_modified, dotnet_type, tenant_id)
                 OUTPUT inserted.version
                 VALUES (@id, @data, 1, SYSDATETIMEOFFSET(), @dotnet_type, @tenant_id);
-                """;
+                """);
 
-            AddBaseParameters(command);
+            builder.AddParameters(new Dictionary<string, object?>
+            {
+                ["id"] = _id, ["data"] = _json,
+                ["dotnet_type"] = _mapping.DotNetTypeName, ["tenant_id"] = _tenantId
+            });
         }
     }
 
-    public async Task PostprocessAsync(SqlCommand command, CancellationToken token)
+    public async Task PostprocessAsync(DbDataReader reader, CancellationToken token)
     {
-        try
+        if (await reader.ReadAsync(token))
         {
-            await using var reader = await command.ExecuteReaderAsync(token);
-            if (await reader.ReadAsync(token))
+            var newVersion = reader.GetInt32(0);
+
+            if (_mapping.UseNumericRevisions && _document is IRevisioned revisioned)
             {
-                var newVersion = reader.GetInt32(0);
+                revisioned.Version = newVersion;
+            }
 
-                if (_mapping.UseNumericRevisions && _document is IRevisioned revisioned)
-                {
-                    revisioned.Version = newVersion;
-                }
-
-                if (_mapping.UseOptimisticConcurrency && _document is IVersioned versioned)
-                {
-                    versioned.Version = reader.GetGuid(1);
-                }
+            if (_mapping.UseOptimisticConcurrency && _document is IVersioned versioned)
+            {
+                versioned.Version = reader.GetGuid(1);
             }
         }
-        catch (SqlException ex) when (ex.Number == 2627) // PK violation
-        {
-            throw new DocumentAlreadyExistsException(_mapping.DocumentType, _id);
-        }
-    }
-
-    private void AddBaseParameters(SqlCommand command)
-    {
-        command.Parameters.AddWithValue("@id", _id);
-        command.Parameters.AddWithValue("@data", _json);
-        command.Parameters.AddWithValue("@dotnet_type", _mapping.DotNetTypeName);
-        command.Parameters.AddWithValue("@tenant_id", _tenantId);
     }
 }

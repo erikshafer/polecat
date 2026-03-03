@@ -1,6 +1,7 @@
+using System.Data.Common;
 using JasperFx.Events.Projections;
-using Microsoft.Data.SqlClient;
 using Polecat.Internal;
+using Weasel.SqlServer;
 
 namespace Polecat.Events.Daemon.Progress;
 
@@ -21,19 +22,19 @@ internal class InsertProjectionProgress : IStorageOperation
     public Type DocumentType => typeof(ShardState);
     public OperationRole Role => OperationRole.Insert;
 
-    public void ConfigureCommand(SqlCommand command)
+    public void ConfigureCommand(ICommandBuilder builder)
     {
-        command.CommandText = $"""
+        builder.Append($"""
             INSERT INTO {_events.ProgressionTableName} (name, last_seq_id, last_updated)
             VALUES (@name, @seq, SYSDATETIMEOFFSET());
-            """;
+            """);
 
-        command.Parameters.AddWithValue("@name", _range.ShardName.Identity);
-        command.Parameters.AddWithValue("@seq", _range.SequenceCeiling);
+        builder.AddParameters(new Dictionary<string, object?>
+        {
+            ["name"] = _range.ShardName.Identity,
+            ["seq"] = _range.SequenceCeiling
+        });
     }
 
-    public async Task PostprocessAsync(SqlCommand command, CancellationToken token)
-    {
-        await command.ExecuteNonQueryAsync(token);
-    }
+    public Task PostprocessAsync(DbDataReader reader, CancellationToken token) => Task.CompletedTask;
 }

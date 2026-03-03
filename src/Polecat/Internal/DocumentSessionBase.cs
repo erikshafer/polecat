@@ -11,6 +11,7 @@ using Polecat.Linq.Members;
 using Polecat.Linq.Parsing;
 using Polecat.Metadata;
 using Polecat.Projections;
+using Weasel.SqlServer;
 
 namespace Polecat.Internal;
 
@@ -324,25 +325,33 @@ internal abstract class DocumentSessionBase : QuerySession, IDocumentSession
                 }
             }
 
-            // Process document operations
-            foreach (var operation in _workTracker.Operations)
+            // Process document operations using BatchBuilder/SqlBatch
+            if (_workTracker.Operations.Count > 0)
             {
-                await using var cmd = conn.CreateCommand();
-                cmd.Transaction = tx;
-                operation.ConfigureCommand(cmd);
+                await using var batch = new SqlBatch(conn);
+                batch.Transaction = tx;
+                var builder = new BatchBuilder(batch);
 
-                Logger.OnBeforeExecute(cmd);
-                try
+                var operations = _workTracker.Operations;
+                for (var i = 0; i < operations.Count; i++)
                 {
-                    await operation.PostprocessAsync(cmd, token);
-                    RequestCount++;
-                    Logger.LogSuccess(cmd);
+                    if (i > 0) builder.StartNewCommand();
+                    operations[i].ConfigureCommand(builder);
                 }
-                catch (Exception ex)
+
+                builder.Compile();
+
+                await using var reader = await batch.ExecuteReaderAsync(token);
+                for (var i = 0; i < operations.Count; i++)
                 {
-                    Logger.LogFailure(cmd, ex);
-                    throw;
+                    await operations[i].PostprocessAsync(reader, token);
+                    if (i < operations.Count - 1)
+                    {
+                        await reader.NextResultAsync(token);
+                    }
                 }
+
+                RequestCount++;
             }
 
             await tx.CommitAsync(token);

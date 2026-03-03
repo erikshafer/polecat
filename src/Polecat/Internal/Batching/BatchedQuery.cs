@@ -1,6 +1,7 @@
+using Microsoft.Data.SqlClient;
 using Polecat.Batching;
 using Polecat.Linq;
-using Polecat.Linq.SqlGeneration;
+using Weasel.SqlServer;
 
 namespace Polecat.Internal.Batching;
 
@@ -86,24 +87,23 @@ internal class BatchedQuery : IBatchedQuery
         // Ensure tables exist for all involved document types
         await _tableEnsurer.EnsureTablesAsync(_involvedProviders, token);
 
-        // Build the combined command
-        var builder = new CommandBuilder();
-        foreach (var item in _items)
-        {
-            item.WriteSql(builder);
-        }
-
+        // Build the combined batch
         var conn = await _session.GetConnectionAsync(token);
-        await using var cmd = conn.CreateCommand();
-
+        await using var batch = new SqlBatch(conn);
         if (_session.ActiveTransaction != null)
         {
-            cmd.Transaction = _session.ActiveTransaction;
+            batch.Transaction = _session.ActiveTransaction;
         }
 
-        builder.ApplyTo(cmd);
+        var builder = new BatchBuilder(batch);
+        for (var i = 0; i < _items.Count; i++)
+        {
+            if (i > 0) builder.StartNewCommand();
+            _items[i].WriteSql(builder);
+        }
 
-        await using var reader = await cmd.ExecuteReaderAsync(token);
+        builder.Compile();
+        await using var reader = await batch.ExecuteReaderAsync(token);
 
         // Process each result set
         for (var i = 0; i < _items.Count; i++)

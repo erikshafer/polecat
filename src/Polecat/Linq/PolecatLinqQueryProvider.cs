@@ -1,3 +1,4 @@
+using System.Data.Common;
 using System.Linq.Expressions;
 using System.Text;
 using Microsoft.Data.SqlClient;
@@ -8,6 +9,7 @@ using Polecat.Linq.QueryHandlers;
 using Polecat.Linq.Selectors;
 using Polecat.Linq.SqlGeneration;
 using Polecat.Metadata;
+using Weasel.SqlServer;
 
 namespace Polecat.Linq;
 
@@ -57,9 +59,10 @@ internal class PolecatLinqQueryProvider : IQueryProvider
     internal string BuildSql(Expression expression, string tenantId)
     {
         var statement = BuildStatement(expression, tenantId);
-        var builder = new CommandBuilder();
+        var builder = new BatchBuilder();
         statement.Apply(builder);
-        return builder.ToString();
+        var batch = builder.Compile();
+        return batch.BatchCommands[0].CommandText;
     }
 
     internal Statement BuildStatement(Expression expression, string tenantId)
@@ -131,20 +134,18 @@ internal class PolecatLinqQueryProvider : IQueryProvider
 
         ApplyModifiedFilters(parser);
 
-        var builder = new CommandBuilder();
-        parser.Statement.Apply(builder);
-
         var conn = await _session.GetConnectionAsync(token);
-        await using var cmd = conn.CreateCommand();
-
+        await using var batch = new SqlBatch(conn);
         if (_session.ActiveTransaction != null)
         {
-            cmd.Transaction = _session.ActiveTransaction;
+            batch.Transaction = _session.ActiveTransaction;
         }
 
-        builder.ApplyTo(cmd);
+        var builder = new BatchBuilder(batch);
+        parser.Statement.Apply(builder);
+        builder.Compile();
 
-        await using var reader = await cmd.ExecuteReaderAsync(token);
+        await using var reader = await batch.ExecuteReaderAsync(token);
 
         var sb = new StringBuilder("[");
         var first = true;
@@ -240,22 +241,19 @@ internal class PolecatLinqQueryProvider : IQueryProvider
             }
         }
 
-        // Build SQL
-        var builder = new CommandBuilder();
-        parser.Statement.Apply(builder);
-
-        // Execute query
+        // Build SQL and execute via BatchBuilder/SqlBatch
         var conn = await _session.GetConnectionAsync(token);
-        await using var cmd = conn.CreateCommand();
-
+        await using var batch = new SqlBatch(conn);
         if (_session.ActiveTransaction != null)
         {
-            cmd.Transaction = _session.ActiveTransaction;
+            batch.Transaction = _session.ActiveTransaction;
         }
 
-        builder.ApplyTo(cmd);
+        var builder = new BatchBuilder(batch);
+        parser.Statement.Apply(builder);
+        builder.Compile();
 
-        await using var reader = await cmd.ExecuteReaderAsync(token);
+        await using var reader = await batch.ExecuteReaderAsync(token);
 
         return await HandleResultAsync<TResult>(reader, parser, documentType, token, syncRevision, syncGuidVersion);
     }
@@ -333,7 +331,7 @@ internal class PolecatLinqQueryProvider : IQueryProvider
     }
 
     private async Task<TResult> HandleResultAsync<TResult>(
-        SqlDataReader reader, LinqQueryParser parser, Type documentType, CancellationToken token,
+        DbDataReader reader, LinqQueryParser parser, Type documentType, CancellationToken token,
         bool syncRevision = false, bool syncGuidVersion = false)
     {
         if (parser.ValueMode == null)
@@ -393,7 +391,7 @@ internal class PolecatLinqQueryProvider : IQueryProvider
     }
 
     private async Task<TResult> InvokeListHandlerAsync<TResult>(
-        Type itemType, SqlDataReader reader, CancellationToken token,
+        Type itemType, DbDataReader reader, CancellationToken token,
         bool syncRevision = false, bool syncGuidVersion = false)
     {
         var selectorType = typeof(DeserializingSelector<>).MakeGenericType(itemType);
@@ -411,7 +409,7 @@ internal class PolecatLinqQueryProvider : IQueryProvider
     }
 
     private async Task<TResult> InvokeScalarListHandlerAsync<TResult>(
-        SqlDataReader reader, CancellationToken token)
+        DbDataReader reader, CancellationToken token)
     {
         // TResult is IReadOnlyList<TScalar>, extract TScalar
         var scalarType = typeof(TResult).GetGenericArguments()[0];
@@ -427,7 +425,7 @@ internal class PolecatLinqQueryProvider : IQueryProvider
     }
 
     private async Task<TResult> InvokeProjectionHandlerAsync<TResult>(
-        Type sourceType, SqlDataReader reader, LambdaExpression selectExpression,
+        Type sourceType, DbDataReader reader, LambdaExpression selectExpression,
         CancellationToken token)
     {
         // TResult is IReadOnlyList<TProjected>
@@ -444,7 +442,7 @@ internal class PolecatLinqQueryProvider : IQueryProvider
     }
 
     private async Task<TResult> InvokeOneResultHandlerAsync<TResult>(
-        Type documentType, SqlDataReader reader, CancellationToken token,
+        Type documentType, DbDataReader reader, CancellationToken token,
         bool canBeNull, bool canBeMultiples,
         bool syncRevision = false, bool syncGuidVersion = false)
     {

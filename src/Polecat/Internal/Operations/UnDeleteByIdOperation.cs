@@ -1,5 +1,6 @@
-using Microsoft.Data.SqlClient;
+using System.Data.Common;
 using Polecat.Storage;
+using Weasel.SqlServer;
 
 namespace Polecat.Internal.Operations;
 
@@ -20,16 +21,12 @@ internal class UnDeleteByIdOperation : IStorageOperation
     public OperationRole Role => OperationRole.Update;
     public object? DocumentId => _id;
 
-    public void ConfigureCommand(SqlCommand command)
+    public void ConfigureCommand(ICommandBuilder builder)
     {
-        command.CommandText =
-            $"UPDATE {_mapping.QualifiedTableName} SET is_deleted = 0, deleted_at = NULL WHERE id = @id AND tenant_id = @tenant_id;";
-        command.Parameters.AddWithValue("@id", _id);
-        command.Parameters.AddWithValue("@tenant_id", _tenantId);
+        builder.Append(
+            $"UPDATE {_mapping.QualifiedTableName} SET is_deleted = 0, deleted_at = NULL WHERE id = @id AND tenant_id = @tenant_id;");
+        builder.AddParameters(new Dictionary<string, object?> { ["id"] = _id, ["tenant_id"] = _tenantId });
     }
 
-    public async Task PostprocessAsync(SqlCommand command, CancellationToken token)
-    {
-        await command.ExecuteNonQueryAsync(token);
-    }
+    public Task PostprocessAsync(DbDataReader reader, CancellationToken token) => Task.CompletedTask;
 }

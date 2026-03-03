@@ -1,7 +1,8 @@
+using System.Data.Common;
 using JasperFx.Events.Projections;
-using Microsoft.Data.SqlClient;
 using Polecat.Exceptions;
 using Polecat.Internal;
+using Weasel.SqlServer;
 
 namespace Polecat.Events.Daemon.Progress;
 
@@ -23,23 +24,26 @@ internal class UpdateProjectionProgress : IStorageOperation
     public Type DocumentType => typeof(ShardState);
     public OperationRole Role => OperationRole.Update;
 
-    public void ConfigureCommand(SqlCommand command)
+    public void ConfigureCommand(ICommandBuilder builder)
     {
-        command.CommandText = $"""
+        builder.Append($"""
             UPDATE {_events.ProgressionTableName}
             SET last_seq_id = @ceiling, last_updated = SYSDATETIMEOFFSET()
+            OUTPUT inserted.name
             WHERE name = @name AND last_seq_id = @floor;
-            """;
+            """);
 
-        command.Parameters.AddWithValue("@name", _range.ShardName.Identity);
-        command.Parameters.AddWithValue("@ceiling", _range.SequenceCeiling);
-        command.Parameters.AddWithValue("@floor", _range.SequenceFloor);
+        builder.AddParameters(new Dictionary<string, object?>
+        {
+            ["name"] = _range.ShardName.Identity,
+            ["ceiling"] = _range.SequenceCeiling,
+            ["floor"] = _range.SequenceFloor
+        });
     }
 
-    public async Task PostprocessAsync(SqlCommand command, CancellationToken token)
+    public async Task PostprocessAsync(DbDataReader reader, CancellationToken token)
     {
-        var rows = await command.ExecuteNonQueryAsync(token);
-        if (rows == 0)
+        if (!await reader.ReadAsync(token))
         {
             throw new ProgressionProgressOutOfOrderException(
                 _range.ShardName.Identity,

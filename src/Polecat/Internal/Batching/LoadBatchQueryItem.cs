@@ -1,7 +1,7 @@
-using Microsoft.Data.SqlClient;
-using Polecat.Linq.SqlGeneration;
+using System.Data.Common;
 using Polecat.Metadata;
 using Polecat.Serialization;
+using Weasel.SqlServer;
 
 namespace Polecat.Internal.Batching;
 
@@ -23,19 +23,21 @@ internal class LoadBatchQueryItem<T> : IBatchQueryItem where T : class
 
     public Task<T?> Result => _tcs.Task;
 
-    public void WriteSql(CommandBuilder builder)
+    public void WriteSql(ICommandBuilder builder)
     {
-        var idParam = builder.AddParameter(_id);
-        var tenantParam = builder.AddParameter(_tenantId);
-
         var softDeleteFilter = _provider.Mapping.DeleteStyle == DeleteStyle.SoftDelete
             ? " AND is_deleted = 0"
             : "";
 
-        builder.Append($"{_provider.SelectSql} WHERE id = {idParam} AND tenant_id = {tenantParam}{softDeleteFilter};\n");
+        builder.Append($"{_provider.SelectSql} WHERE id = ");
+        builder.AppendParameter(_id);
+        builder.Append(" AND tenant_id = ");
+        builder.AppendParameter(_tenantId);
+        builder.Append(softDeleteFilter);
+        builder.Append(";\n");
     }
 
-    public async Task ReadResultSetAsync(SqlDataReader reader, CancellationToken token)
+    public async Task ReadResultSetAsync(DbDataReader reader, CancellationToken token)
     {
         if (await reader.ReadAsync(token))
         {

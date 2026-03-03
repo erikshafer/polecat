@@ -1,4 +1,5 @@
-using Microsoft.Data.SqlClient;
+using System.Data.Common;
+using Weasel.SqlServer;
 
 namespace Polecat.Internal;
 
@@ -36,12 +37,12 @@ public interface IStorageOperation
     object? DocumentId => null;
 
     /// <summary>
-    ///     Configure the SqlCommand for execution.
+    ///     Configure the SQL command via the command builder.
     /// </summary>
-    void ConfigureCommand(SqlCommand command);
+    void ConfigureCommand(ICommandBuilder builder);
 
     /// <summary>
     ///     Process results after execution (e.g., capture OUTPUT version).
     /// </summary>
-    Task PostprocessAsync(SqlCommand command, CancellationToken token);
+    Task PostprocessAsync(DbDataReader reader, CancellationToken token);
 }

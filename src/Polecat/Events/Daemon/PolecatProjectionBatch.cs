@@ -4,6 +4,7 @@ using JasperFx.Events.Daemon;
 using JasperFx.Events.Projections;
 using Microsoft.Data.SqlClient;
 using Polecat.Internal;
+using Weasel.SqlServer;
 
 namespace Polecat.Events.Daemon;
 
@@ -52,7 +53,9 @@ internal class PolecatProjectionBatch : IProjectionBatch<IDocumentSession, IQuer
             var tableEnsurer = new DocumentTableEnsurer(
                 new ConnectionFactory(_connectionString), _store.Options);
 
-            // Collect all operations from all sessions
+            // Collect all operations from all sessions and progress ops into a single batch
+            var allOps = new List<IStorageOperation>();
+
             foreach (var session in _sessions)
             {
                 if (session is DocumentSessionBase sessionBase)
@@ -68,48 +71,78 @@ internal class PolecatProjectionBatch : IProjectionBatch<IDocumentSession, IQuer
                             .Distinct()
                             .Select(t => _store.GetProvider(t));
                         await tableEnsurer.EnsureTablesAsync(providers, token);
-                    }
 
-                    // Execute document operations
-                    foreach (var operation in workTracker.Operations)
-                    {
-                        await using var cmd = conn.CreateCommand();
-                        cmd.Transaction = tx;
-                        operation.ConfigureCommand(cmd);
-                        await operation.PostprocessAsync(cmd, token);
+                        allOps.AddRange(workTracker.Operations);
                     }
                 }
             }
 
-            // Execute progress operations
-            foreach (var progressOp in _progressOps.ToArray())
+            // Execute all document operations + progress operations in a single SqlBatch
+            var progressArray = _progressOps.ToArray();
+            var totalCommands = allOps.Count + progressArray.Length;
+
+            if (totalCommands > 0)
             {
-                await using var cmd = conn.CreateCommand();
-                cmd.Transaction = tx;
+                await using var batch = new SqlBatch(conn);
+                batch.Transaction = tx;
+                var builder = new BatchBuilder(batch);
 
-                if (progressOp.Floor == 0)
+                var commandIndex = 0;
+
+                // Document operations
+                foreach (var operation in allOps)
                 {
-                    // MERGE for initial progress
-                    cmd.CommandText = $"""
-                        MERGE {_events.ProgressionTableName} AS target
-                        USING (SELECT @name AS name) AS source ON target.name = source.name
-                        WHEN MATCHED THEN UPDATE SET last_seq_id = @seq, last_updated = SYSDATETIMEOFFSET()
-                        WHEN NOT MATCHED THEN INSERT (name, last_seq_id, last_updated)
-                            VALUES (@name, @seq, SYSDATETIMEOFFSET());
-                        """;
-                }
-                else
-                {
-                    cmd.CommandText = $"""
-                        UPDATE {_events.ProgressionTableName}
-                        SET last_seq_id = @seq, last_updated = SYSDATETIMEOFFSET()
-                        WHERE name = @name;
-                        """;
+                    if (commandIndex > 0) builder.StartNewCommand();
+                    operation.ConfigureCommand(builder);
+                    commandIndex++;
                 }
 
-                cmd.Parameters.AddWithValue("@name", progressOp.Name);
-                cmd.Parameters.AddWithValue("@seq", progressOp.Ceiling);
-                await cmd.ExecuteNonQueryAsync(token);
+                // Progress operations
+                foreach (var progressOp in progressArray)
+                {
+                    if (commandIndex > 0) builder.StartNewCommand();
+
+                    if (progressOp.Floor == 0)
+                    {
+                        builder.Append($"""
+                            MERGE {_events.ProgressionTableName} AS target
+                            USING (SELECT @name AS name) AS source ON target.name = source.name
+                            WHEN MATCHED THEN UPDATE SET last_seq_id = @seq, last_updated = SYSDATETIMEOFFSET()
+                            WHEN NOT MATCHED THEN INSERT (name, last_seq_id, last_updated)
+                                VALUES (@name, @seq, SYSDATETIMEOFFSET());
+                            """);
+                    }
+                    else
+                    {
+                        builder.Append($"""
+                            UPDATE {_events.ProgressionTableName}
+                            SET last_seq_id = @seq, last_updated = SYSDATETIMEOFFSET()
+                            WHERE name = @name;
+                            """);
+                    }
+
+                    builder.AddParameters(new Dictionary<string, object?>
+                    {
+                        ["name"] = progressOp.Name,
+                        ["seq"] = progressOp.Ceiling
+                    });
+
+                    commandIndex++;
+                }
+
+                builder.Compile();
+                await using var reader = await batch.ExecuteReaderAsync(token);
+
+                // Process document operation results
+                for (var i = 0; i < allOps.Count; i++)
+                {
+                    await allOps[i].PostprocessAsync(reader, token);
+                    if (i < totalCommands - 1)
+                    {
+                        await reader.NextResultAsync(token);
+                    }
+                }
+                // Progress ops don't need result processing
             }
 
             await tx.CommitAsync(token);
