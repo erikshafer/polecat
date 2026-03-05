@@ -1,0 +1,12 @@
+:root {
+  --polecat-blue: #2b5c8a;
+  --polecat-blue-light: #4a7eb5;
+  --polecat-blue-dark: #1e4568;
+  --polecat-blue-soft: rgba(43, 92, 138, 0.14);
+
+  --vp-c-brand-1: var(--polecat-blue);
+  --vp-c-brand-2: var(--polecat-blue-dark);
+  --vp-c-brand-3: var(--polecat-blue-light);
+  --vp-c-brand-soft: var(--polecat-blue-soft);
+  --vp-home-hero-name-color: var(--vp-c-brand-1);
+}

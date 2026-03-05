@@ -1,0 +1,119 @@
+# Appending Events
+
+Polecat provides several ways to append events to streams.
+
+## Starting a New Stream
+
+Create a new event stream with initial events:
+
+```cs
+// With explicit ID
+var streamId = Guid.NewGuid();
+session.Events.StartStream<QuestParty>(streamId,
+    new QuestStarted("Destroy the Ring"),
+    new MembersJoined("Rivendell", ["Frodo", "Sam"])
+);
+
+// With auto-generated ID
+var streamId = session.Events.StartStream<QuestParty>(
+    new QuestStarted("Destroy the Ring")
+);
+
+// String stream IDs (when StreamIdentity = AsString)
+session.Events.StartStream<QuestParty>("quest-123",
+    new QuestStarted("Destroy the Ring")
+);
+```
+
+`StartStream` will throw if a stream with the same ID already exists.
+
+## Appending to an Existing Stream
+
+```cs
+session.Events.Append(streamId,
+    new MembersJoined("Moria", ["Gimli", "Legolas"]),
+    new MembersDeparted("Moria", ["Gandalf"])
+);
+
+await session.SaveChangesAsync();
+```
+
+## Optimistic Concurrency
+
+Append with an expected version to detect concurrent modifications:
+
+```cs
+session.Events.Append(streamId, expectedVersion: 4,
+    new MembersDeparted("Amon Hen", ["Boromir"])
+);
+
+// Throws EventStreamUnexpectedMaxEventIdException
+// if current stream version != 4
+await session.SaveChangesAsync();
+```
+
+## FetchForWriting
+
+Load an aggregate and append events with built-in version checking:
+
+```cs
+var stream = await session.Events.FetchForWriting<QuestParty>(streamId);
+
+// stream.Aggregate is the current state
+// stream.CurrentVersion is the current version
+
+stream.AppendOne(new MembersDeparted("Amon Hen", ["Boromir"]));
+await session.SaveChangesAsync();
+```
+
+## FetchForExclusiveWriting
+
+Pessimistic locking with `UPDLOCK HOLDLOCK` for exclusive access:
+
+```cs
+var stream = await session.Events.FetchForExclusiveWriting<QuestParty>(streamId);
+
+// The stream row is locked until the transaction completes
+stream.AppendOne(new MembersJoined("Gondor", ["Faramir"]));
+await session.SaveChangesAsync();
+```
+
+## WriteToAggregate
+
+Fetch, apply, and save in a single call:
+
+```cs
+await session.Events.WriteToAggregate<QuestParty>(streamId, stream =>
+{
+    stream.AppendOne(new MembersDeparted("Mordor", ["Frodo", "Sam"]));
+});
+
+await session.SaveChangesAsync();
+```
+
+## QuickAppend
+
+Polecat uses **QuickAppend** exclusively -- all event appending is done via direct SQL `INSERT` statements with an `UPDATE...OUTPUT` pattern for atomic version management. No stored procedures are involved.
+
+The flow:
+
+1. `INSERT` new events into `pc_events`
+2. `UPDATE pc_streams SET version = version + @count OUTPUT INSERTED.version` for version management
+3. Both operations run in the same transaction as document operations via `SaveChangesAsync()`
+
+## Event Metadata
+
+Set correlation and causation IDs via session options:
+
+```cs
+await using var session = store.LightweightSession(new SessionOptions
+{
+    CorrelationId = "request-123",
+    CausationId = "command-456"
+});
+
+session.Events.Append(streamId, new QuestEnded("Destroy the Ring"));
+await session.SaveChangesAsync();
+```
+
+Custom headers can be added to individual events via the `Headers` property on `StreamAction`.

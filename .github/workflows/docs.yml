@@ -1,0 +1,31 @@
+name: Docs build and deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish_docs:
+        description: 'Publish docs'
+        type: boolean
+        default: true
+
+env:
+  node_version: 24.x
+
+jobs:
+  build-and-deploy:
+    name: Build and deploy docs
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.node_version }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build docs
+        run: npm run docs-build
