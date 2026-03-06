@@ -630,12 +630,48 @@ internal abstract class DocumentSessionBase : QuerySession, IDocumentSession
         }
 
         await using var cmd = new SqlCommand();
-        cmd.CommandText = $"""
-            INSERT INTO {_eventGraph.EventsTableName}
-                ({columns})
-            OUTPUT inserted.seq_id
-            VALUES ({values});
-            """;
+
+        var tags = @event.Tags;
+        var hasTags = tags != null && tags.Count > 0 && _eventGraph.TagTypes.Count > 0;
+
+        if (hasTags)
+        {
+            // Batch event insert + tag inserts into a single command to minimize round-trips
+            var schema = _eventGraph.DatabaseSchemaName;
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine("DECLARE @new_seq TABLE (seq_id bigint);");
+            sb.AppendLine($"INSERT INTO {_eventGraph.EventsTableName}");
+            sb.AppendLine($"    ({columns})");
+            sb.AppendLine("OUTPUT inserted.seq_id INTO @new_seq");
+            sb.AppendLine($"VALUES ({values});");
+            sb.AppendLine("DECLARE @seq_id bigint = (SELECT TOP 1 seq_id FROM @new_seq);");
+
+            var tagIndex = 0;
+            foreach (var tag in tags!)
+            {
+                var registration = _eventGraph.FindTagType(tag.TagType);
+                if (registration == null) continue;
+
+                var valueParam = $"@tag_value_{tagIndex}";
+                sb.AppendLine($"IF NOT EXISTS (SELECT 1 FROM [{schema}].[pc_event_tag_{registration.TableSuffix}] WHERE value = {valueParam} AND seq_id = @seq_id)");
+                sb.AppendLine($"INSERT INTO [{schema}].[pc_event_tag_{registration.TableSuffix}] (value, seq_id) VALUES ({valueParam}, @seq_id);");
+                cmd.Parameters.AddWithValue(valueParam, tag.Value);
+                tagIndex++;
+            }
+
+            sb.AppendLine("SELECT @seq_id;");
+            cmd.CommandText = sb.ToString();
+        }
+        else
+        {
+            cmd.CommandText = $"""
+                INSERT INTO {_eventGraph.EventsTableName}
+                    ({columns})
+                OUTPUT inserted.seq_id
+                VALUES ({values});
+                """;
+        }
+
         cmd.Parameters.AddWithValue("@id", @event.Id);
         cmd.Parameters.AddWithValue("@stream_id", streamId);
         cmd.Parameters.AddWithValue("@version", @event.Version);
@@ -667,33 +703,6 @@ internal abstract class DocumentSessionBase : QuerySession, IDocumentSession
 
         var seqId = (long)(await ExecuteScalarAsync(cmd, token))!;
         @event.Sequence = seqId;
-
-        // Insert tag rows for DCB support
-        await InsertEventTagsAsync(@event, seqId, token);
-    }
-
-    private async Task InsertEventTagsAsync(IEvent @event, long seqId, CancellationToken token)
-    {
-        var tags = @event.Tags;
-        if (tags == null || tags.Count == 0 || _eventGraph.TagTypes.Count == 0) return;
-
-        var schema = _eventGraph.DatabaseSchemaName;
-
-        foreach (var tag in tags)
-        {
-            var registration = _eventGraph.FindTagType(tag.TagType);
-            if (registration == null) continue;
-
-            await using var tagCmd = new SqlCommand();
-            tagCmd.CommandText = $"""
-                IF NOT EXISTS (SELECT 1 FROM [{schema}].[pc_event_tag_{registration.TableSuffix}] WHERE value = @value AND seq_id = @seq_id)
-                INSERT INTO [{schema}].[pc_event_tag_{registration.TableSuffix}] (value, seq_id) VALUES (@value, @seq_id);
-                """;
-            tagCmd.Parameters.AddWithValue("@value", tag.Value);
-            tagCmd.Parameters.AddWithValue("@seq_id", seqId);
-
-            await ExecuteScalarAsync(tagCmd, token);
-        }
     }
 
     // IStorageOperations
