@@ -78,6 +78,44 @@ stream.AppendOne(new MembersJoined("Gondor", ["Faramir"]));
 await session.SaveChangesAsync();
 ```
 
+## Enforcing Consistency Without Appending Events
+
+In some command handling scenarios, your business logic may evaluate the current aggregate state and decide that no new events need to be emitted. By default, if no events are appended to the stream returned by `FetchForWriting()`, Polecat will not perform any concurrency check when `SaveChangesAsync()` is called. This means that if another process has modified the stream between your fetch and save, you won't know about it.
+
+If you need to guarantee that the stream has not been modified even when your handler doesn't emit events, you can set `AlwaysEnforceConsistency = true` on the stream:
+
+```cs
+var stream = await session.Events.FetchForWriting<Order>(command.OrderId);
+
+// Tell Polecat to enforce the optimistic concurrency check
+// even if we don't append any events
+stream.AlwaysEnforceConsistency = true;
+
+var order = stream.Aggregate;
+
+// Business logic that may or may not produce events
+if (order.NeedsUpdate(command))
+{
+    stream.AppendOne(new OrderUpdated(command.Data));
+}
+
+// If no events were appended, Polecat will still verify that the
+// stream version hasn't changed since FetchForWriting() was called.
+// Throws EventStreamUnexpectedMaxEventIdException if another process modified the stream.
+await session.SaveChangesAsync();
+```
+
+When `AlwaysEnforceConsistency` is `true`:
+
+- **If events are appended**, Polecat behaves exactly as before -- the normal optimistic concurrency check is applied.
+- **If no events are appended**, Polecat issues an `AssertStreamVersion` check that reads the current stream version from the database and throws an `EventStreamUnexpectedMaxEventIdException` if it doesn't match the version that was fetched.
+
+This is useful in workflows where:
+
+- A command handler conditionally emits events and you need to know if another process raced ahead
+- You want to implement "read-then-validate" patterns where consistency of the read matters even without writes
+- You're building saga or process manager patterns where skipping an event is a valid but concurrency-sensitive outcome
+
 ## WriteToAggregate
 
 Fetch, apply, and save in a single call:
