@@ -76,4 +76,4 @@ When writing integration tests:
 
 ## Integration with Wolverine
 
-Natural keys integrate with Wolverine's aggregate handler workflow. See the [Wolverine documentation on natural keys with Polecat](/guide/durability/polecat/event-sourcing#natural-keys) for details on how Wolverine resolves natural keys from command properties.
+Natural keys integrate with Wolverine's aggregate handler workflow. See the [Wolverine documentation on natural keys with Polecat](https://wolverinefx.io/guide/durability/polecat/event-sourcing#natural-keys) for details on how Wolverine resolves natural keys from command properties.
