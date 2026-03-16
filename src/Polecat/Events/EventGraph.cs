@@ -57,6 +57,11 @@ public class EventGraph : EventRegistry, IAggregationSourceFactory<IQuerySession
 
     internal EventStoreOptions EventOptions => _options.Events;
 
+    /// <summary>
+    ///     Whether extended progression tracking columns are enabled.
+    /// </summary>
+    public bool EnableExtendedProgressionTracking => _options.Events.EnableExtendedProgressionTracking;
+
     internal string StreamsTableName => $"[{DatabaseSchemaName}].[pc_streams]";
     internal string EventsTableName => $"[{DatabaseSchemaName}].[pc_events]";
     internal string ProgressionTableName => $"[{DatabaseSchemaName}].[pc_event_progression]";
@@ -148,7 +153,7 @@ public class EventGraph : EventRegistry, IAggregationSourceFactory<IQuerySession
 
     internal EventProgressionTable BuildEventProgressionTable()
     {
-        return new EventProgressionTable(DatabaseSchemaName);
+        return new EventProgressionTable(this);
     }
 
     public ITagTypeRegistration RegisterTagType<TTag>() where TTag : notnull

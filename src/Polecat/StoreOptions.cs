@@ -281,6 +281,12 @@ public class EventStoreOptions
     public bool EnableHeaders { get; set; }
 
     /// <summary>
+    ///     Opt into extended columns on the event progression table for CritterWatch alerting.
+    ///     Adds nullable heartbeat, agent_status, pause_reason, and running_on_node columns.
+    /// </summary>
+    public bool EnableExtendedProgressionTracking { get; set; }
+
+    /// <summary>
     ///     Register a tag type for Dynamic Consistency Boundary (DCB) support.
     ///     Creates a tag table with an auto-generated suffix.
     /// </summary>

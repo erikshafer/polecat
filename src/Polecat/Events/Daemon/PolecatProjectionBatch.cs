@@ -110,21 +110,45 @@ internal class PolecatProjectionBatch : IProjectionBatch<IDocumentSession, IQuer
 
                         if (progressOp.Floor == 0)
                         {
-                            builder.Append($"""
-                                MERGE {_events.ProgressionTableName} AS target
-                                USING (SELECT @name AS name) AS source ON target.name = source.name
-                                WHEN MATCHED THEN UPDATE SET last_seq_id = @seq, last_updated = SYSDATETIMEOFFSET()
-                                WHEN NOT MATCHED THEN INSERT (name, last_seq_id, last_updated)
-                                    VALUES (@name, @seq, SYSDATETIMEOFFSET());
-                                """);
+                            if (_events.EnableExtendedProgressionTracking)
+                            {
+                                builder.Append($"""
+                                    MERGE {_events.ProgressionTableName} AS target
+                                    USING (SELECT @name AS name) AS source ON target.name = source.name
+                                    WHEN MATCHED THEN UPDATE SET last_seq_id = @seq, last_updated = SYSDATETIMEOFFSET(), heartbeat = SYSDATETIMEOFFSET()
+                                    WHEN NOT MATCHED THEN INSERT (name, last_seq_id, last_updated, heartbeat)
+                                        VALUES (@name, @seq, SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET());
+                                    """);
+                            }
+                            else
+                            {
+                                builder.Append($"""
+                                    MERGE {_events.ProgressionTableName} AS target
+                                    USING (SELECT @name AS name) AS source ON target.name = source.name
+                                    WHEN MATCHED THEN UPDATE SET last_seq_id = @seq, last_updated = SYSDATETIMEOFFSET()
+                                    WHEN NOT MATCHED THEN INSERT (name, last_seq_id, last_updated)
+                                        VALUES (@name, @seq, SYSDATETIMEOFFSET());
+                                    """);
+                            }
                         }
                         else
                         {
-                            builder.Append($"""
-                                UPDATE {_events.ProgressionTableName}
-                                SET last_seq_id = @seq, last_updated = SYSDATETIMEOFFSET()
-                                WHERE name = @name;
-                                """);
+                            if (_events.EnableExtendedProgressionTracking)
+                            {
+                                builder.Append($"""
+                                    UPDATE {_events.ProgressionTableName}
+                                    SET last_seq_id = @seq, last_updated = SYSDATETIMEOFFSET(), heartbeat = SYSDATETIMEOFFSET()
+                                    WHERE name = @name;
+                                    """);
+                            }
+                            else
+                            {
+                                builder.Append($"""
+                                    UPDATE {_events.ProgressionTableName}
+                                    SET last_seq_id = @seq, last_updated = SYSDATETIMEOFFSET()
+                                    WHERE name = @name;
+                                    """);
+                            }
                         }
 
                         builder.AddParameters(new Dictionary<string, object?>

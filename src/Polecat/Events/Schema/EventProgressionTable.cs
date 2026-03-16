@@ -10,13 +10,21 @@ internal class EventProgressionTable : Table
 {
     public const string TableName = "pc_event_progression";
 
-    public EventProgressionTable(string schemaName)
-        : base(new SqlServerObjectName(schemaName, TableName))
+    public EventProgressionTable(EventGraph eventGraph)
+        : base(new SqlServerObjectName(eventGraph.DatabaseSchemaName, TableName))
     {
         AddColumn("name", "varchar(200)").AsPrimaryKey().NotNull();
         AddColumn("last_seq_id", "bigint").NotNull().DefaultValue(0);
         AddColumn("last_updated", "datetimeoffset")
             .NotNull()
             .DefaultValueByExpression("SYSDATETIMEOFFSET()");
+
+        if (eventGraph.EnableExtendedProgressionTracking)
+        {
+            AddColumn("heartbeat", "datetimeoffset").AllowNulls();
+            AddColumn("agent_status", "varchar(20)").AllowNulls();
+            AddColumn("pause_reason", "nvarchar(max)").AllowNulls();
+            AddColumn("running_on_node", "int").AllowNulls();
+        }
     }
 }

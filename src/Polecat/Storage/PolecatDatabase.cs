@@ -114,14 +114,46 @@ public class PolecatDatabase : DatabaseBase<SqlConnection>, IEventDatabase
         await conn.OpenAsync(token);
 
         await using var cmd = conn.CreateCommand();
-        cmd.CommandText = $"SELECT name, last_seq_id FROM {_events.ProgressionTableName};";
+        if (_events.EnableExtendedProgressionTracking)
+        {
+            cmd.CommandText = $"SELECT name, last_seq_id, heartbeat, agent_status, pause_reason, running_on_node FROM {_events.ProgressionTableName};";
+        }
+        else
+        {
+            cmd.CommandText = $"SELECT name, last_seq_id FROM {_events.ProgressionTableName};";
+        }
 
         await using var reader = await cmd.ExecuteReaderAsync(token);
         while (await reader.ReadAsync(token))
         {
             var name = reader.GetString(0);
             var seq = reader.GetInt64(1);
-            list.Add(new ShardState(name, seq));
+            var state = new ShardState(name, seq);
+
+            if (_events.EnableExtendedProgressionTracking)
+            {
+                if (!reader.IsDBNull(2))
+                {
+                    state.LastHeartbeat = reader.GetDateTimeOffset(2);
+                }
+
+                if (!reader.IsDBNull(3))
+                {
+                    state.AgentStatus = reader.GetString(3);
+                }
+
+                if (!reader.IsDBNull(4))
+                {
+                    state.PauseReason = reader.GetString(4);
+                }
+
+                if (!reader.IsDBNull(5))
+                {
+                    state.RunningOnNode = reader.GetInt32(5);
+                }
+            }
+
+            list.Add(state);
         }
 
         return list;
