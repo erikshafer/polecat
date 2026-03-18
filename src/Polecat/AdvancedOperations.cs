@@ -137,9 +137,9 @@ public class AdvancedOperations
                     var pTenant = $"@p{paramIndex++}";
 
                     sb.AppendLine(
-                        $"INSERT INTO {mapping.QualifiedTableName} (id, data, version, last_modified, dotnet_type, tenant_id)");
+                        $"INSERT INTO {mapping.QualifiedTableName} (id, data, version, last_modified, created_at, dotnet_type, tenant_id)");
                     sb.AppendLine(
-                        $"VALUES ({pId}, {pData}, 1, SYSDATETIMEOFFSET(), {pType}, {pTenant});");
+                        $"VALUES ({pId}, {pData}, 1, SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET(), {pType}, {pTenant});");
 
                     cmd.Parameters.AddWithValue(pId, id);
                     cmd.Parameters.AddWithValue(pData, json);
@@ -165,9 +165,9 @@ public class AdvancedOperations
                         "    ON target.id = source.id AND target.tenant_id = source.tenant_id");
                     sb.AppendLine("WHEN NOT MATCHED THEN");
                     sb.AppendLine(
-                        $"    INSERT (id, data, version, last_modified, dotnet_type, tenant_id)");
+                        $"    INSERT (id, data, version, last_modified, created_at, dotnet_type, tenant_id)");
                     sb.AppendLine(
-                        $"    VALUES ({pId}, {pData}, 1, SYSDATETIMEOFFSET(), {pType}, {pTenant});");
+                        $"    VALUES ({pId}, {pData}, 1, SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET(), {pType}, {pTenant});");
 
                     cmd.Parameters.AddWithValue(pId, id);
                     cmd.Parameters.AddWithValue(pData, json);
@@ -198,9 +198,9 @@ public class AdvancedOperations
                         $"        last_modified = SYSDATETIMEOFFSET(), dotnet_type = {pType}");
                     sb.AppendLine("WHEN NOT MATCHED THEN");
                     sb.AppendLine(
-                        $"    INSERT (id, data, version, last_modified, dotnet_type, tenant_id)");
+                        $"    INSERT (id, data, version, last_modified, created_at, dotnet_type, tenant_id)");
                     sb.AppendLine(
-                        $"    VALUES ({pId}, {pData}, 1, SYSDATETIMEOFFSET(), {pType}, {pTenant});");
+                        $"    VALUES ({pId}, {pData}, 1, SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET(), {pType}, {pTenant});");
 
                     cmd.Parameters.AddWithValue(pId, id);
                     cmd.Parameters.AddWithValue(pData, json);

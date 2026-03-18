@@ -1037,6 +1037,16 @@ internal class PolecatLinqQueryProvider : IPolecatAsyncQueryProvider
         {
             parser.Statement.Wheres.Add(new ComparisonFilter("last_modified", "<", parser.ModifiedBeforeTimestamp.Value));
         }
+
+        if (parser.CreatedSinceTimestamp.HasValue)
+        {
+            parser.Statement.Wheres.Add(new ComparisonFilter("created_at", ">=", parser.CreatedSinceTimestamp.Value));
+        }
+
+        if (parser.CreatedBeforeTimestamp.HasValue)
+        {
+            parser.Statement.Wheres.Add(new ComparisonFilter("created_at", "<", parser.CreatedBeforeTimestamp.Value));
+        }
     }
 
     private async Task WaitForNonStaleDataAsync(TimeSpan timeout, CancellationToken token)

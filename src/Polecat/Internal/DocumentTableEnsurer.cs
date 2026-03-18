@@ -134,6 +134,7 @@ internal class DocumentTableEnsurer
                         data nvarchar(max) NOT NULL,
                         version int NOT NULL DEFAULT 1,
                         last_modified datetimeoffset NOT NULL DEFAULT SYSDATETIMEOFFSET(),
+                        created_at datetimeoffset NOT NULL DEFAULT SYSDATETIMEOFFSET(),
                         dotnet_type varchar(500) NULL,{softDeleteCols}{guidVersionCol}
                         CONSTRAINT pk_{table} PRIMARY KEY (tenant_id, id)
                     );
@@ -153,6 +154,7 @@ internal class DocumentTableEnsurer
                     data nvarchar(max) NOT NULL,
                     version int NOT NULL DEFAULT 1,
                     last_modified datetimeoffset NOT NULL DEFAULT SYSDATETIMEOFFSET(),
+                    created_at datetimeoffset NOT NULL DEFAULT SYSDATETIMEOFFSET(),
                     dotnet_type varchar(500) NULL,{softDeleteCols}{guidVersionCol}
                     tenant_id varchar(250) NOT NULL DEFAULT '*DEFAULT*'
                 );

@@ -27,7 +27,7 @@ internal class DocumentProvider
     {
         get
         {
-            var baseCols = "id, data, version, last_modified, dotnet_type, tenant_id";
+            var baseCols = "id, data, version, last_modified, created_at, dotnet_type, tenant_id";
             if (Mapping.UseOptimisticConcurrency)
             {
                 baseCols += ", guid_version";

@@ -62,8 +62,8 @@ internal class UpsertOperation : IStorageOperation
               UPDATE SET data = @data, version = target.version + 1,
                 last_modified = SYSDATETIMEOFFSET(), dotnet_type = @dotnet_type
             WHEN NOT MATCHED THEN
-              INSERT (id, data, version, last_modified, dotnet_type, tenant_id)
-              VALUES (@id, @data, 1, SYSDATETIMEOFFSET(), @dotnet_type, @tenant_id)
+              INSERT (id, data, version, last_modified, created_at, dotnet_type, tenant_id)
+              VALUES (@id, @data, 1, SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET(), @dotnet_type, @tenant_id)
             OUTPUT inserted.version;
             """);
 
@@ -80,8 +80,8 @@ internal class UpsertOperation : IStorageOperation
               UPDATE SET data = @data, version = target.version + 1,
                 last_modified = SYSDATETIMEOFFSET(), dotnet_type = @dotnet_type
             WHEN NOT MATCHED THEN
-              INSERT (id, data, version, last_modified, dotnet_type, tenant_id)
-              VALUES (@id, @data, 1, SYSDATETIMEOFFSET(), @dotnet_type, @tenant_id)
+              INSERT (id, data, version, last_modified, created_at, dotnet_type, tenant_id)
+              VALUES (@id, @data, 1, SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET(), @dotnet_type, @tenant_id)
             OUTPUT inserted.version;
             """);
 
@@ -99,8 +99,8 @@ internal class UpsertOperation : IStorageOperation
               UPDATE SET data = @data, version = target.version + 1, guid_version = @new_guid_version,
                 last_modified = SYSDATETIMEOFFSET(), dotnet_type = @dotnet_type
             WHEN NOT MATCHED THEN
-              INSERT (id, data, version, guid_version, last_modified, dotnet_type, tenant_id)
-              VALUES (@id, @data, 1, @new_guid_version, SYSDATETIMEOFFSET(), @dotnet_type, @tenant_id)
+              INSERT (id, data, version, guid_version, last_modified, created_at, dotnet_type, tenant_id)
+              VALUES (@id, @data, 1, @new_guid_version, SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET(), @dotnet_type, @tenant_id)
             OUTPUT inserted.version, inserted.guid_version;
             """);
 
