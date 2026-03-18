@@ -7,6 +7,7 @@ using Microsoft.Data.SqlClient;
 using Polecat.Events.Dcb;
 using Polecat.Events.Fetching;
 using Polecat.Events.Operations;
+using Polecat.Events.Protected;
 using Polecat.Internal;
 using Polecat.Internal.Operations;
 using Polecat.Serialization;
@@ -580,6 +581,22 @@ internal class EventOperations : QueryEventStore, IEventOperations
         throw new InvalidOperationException(
             $"No natural key definition found for aggregate type '{typeof(T).Name}'. " +
             "Configure a natural key via NaturalKey() in a SingleStreamProjection or Snapshot registration.");
+    }
+
+    public async Task CompactStreamAsync<T>(Guid streamId, Action<StreamCompactingRequest<T>>? configure = null)
+        where T : class
+    {
+        var request = new StreamCompactingRequest<T>(streamId);
+        configure?.Invoke(request);
+        await request.ExecuteAsync(_sessionBase).ConfigureAwait(false);
+    }
+
+    public async Task CompactStreamAsync<T>(string streamKey, Action<StreamCompactingRequest<T>>? configure = null)
+        where T : class
+    {
+        var request = new StreamCompactingRequest<T>(streamKey);
+        configure?.Invoke(request);
+        await request.ExecuteAsync(_sessionBase).ConfigureAwait(false);
     }
 
     public IEvent BuildEvent(object data) => _events.BuildEvent(data);

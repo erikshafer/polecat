@@ -2,6 +2,7 @@ using System.Linq.Expressions;
 using JasperFx.Events;
 using JasperFx.Events.Tags;
 using Polecat.Events.Dcb;
+using Polecat.Events.Protected;
 
 namespace Polecat.Events;
 
@@ -259,6 +260,18 @@ public interface IEventOperations : IQueryEventStore
     ///     Fetch events by tags and return a writable boundary with DCB consistency checking.
     /// </summary>
     Task<IEventBoundary<T>> FetchForWritingByTags<T>(EventTagQuery query, CancellationToken cancellation = default) where T : class;
+
+    /// <summary>
+    ///     Compact a stream by replacing its events with a single Compacted&lt;T&gt; snapshot event.
+    ///     Use this when you do not care about older stream data but want to keep database size down.
+    /// </summary>
+    Task CompactStreamAsync<T>(Guid streamId, Action<StreamCompactingRequest<T>>? configure = null) where T : class;
+
+    /// <summary>
+    ///     Compact a stream by replacing its events with a single Compacted&lt;T&gt; snapshot event.
+    ///     Use this when you do not care about older stream data but want to keep database size down.
+    /// </summary>
+    Task CompactStreamAsync<T>(string streamKey, Action<StreamCompactingRequest<T>>? configure = null) where T : class;
 
     /// <summary>
     ///     Build an IEvent wrapper for raw event data. Useful for setting tags before appending.
