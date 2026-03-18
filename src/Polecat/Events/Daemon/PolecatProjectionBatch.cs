@@ -110,34 +110,49 @@ internal class PolecatProjectionBatch : IProjectionBatch<IDocumentSession, IQuer
             {
                 if (ops.Count > 0)
                 {
-                    await using var batch = new SqlBatch(conn);
-                    batch.Transaction = tx;
-                    var builder = new BatchBuilder(batch);
-
-                    var commandIndex = 0;
-                    foreach (var operation in ops)
+                    // Batch and reader must be fully disposed before transaction participants
+                    // run (e.g. EF Core SaveChangesAsync), otherwise SQL Server rejects the
+                    // second command with "batch is aborted / session busy".
+                    var batch = new SqlBatch(conn) { Transaction = tx };
+                    try
                     {
-                        if (commandIndex > 0) builder.StartNewCommand();
-                        operation.ConfigureCommand(builder);
-                        commandIndex++;
-                    }
+                        var builder = new BatchBuilder(batch);
 
-                    builder.Compile();
-                    await using var reader = await batch.ExecuteReaderAsync(ct);
-
-                    var exceptions = new List<Exception>();
-                    for (var i = 0; i < ops.Count; i++)
-                    {
-                        await ops[i].PostprocessAsync(reader, exceptions, ct);
-                        if (i < ops.Count - 1)
+                        var commandIndex = 0;
+                        foreach (var operation in ops)
                         {
-                            await reader.NextResultAsync(ct);
+                            if (commandIndex > 0) builder.StartNewCommand();
+                            operation.ConfigureCommand(builder);
+                            commandIndex++;
+                        }
+
+                        builder.Compile();
+                        var reader = await batch.ExecuteReaderAsync(ct);
+                        try
+                        {
+                            var exceptions = new List<Exception>();
+                            for (var i = 0; i < ops.Count; i++)
+                            {
+                                await ops[i].PostprocessAsync(reader, exceptions, ct);
+                                if (i < ops.Count - 1)
+                                {
+                                    await reader.NextResultAsync(ct);
+                                }
+                            }
+
+                            if (exceptions.Count > 0)
+                            {
+                                throw new AggregateException(exceptions);
+                            }
+                        }
+                        finally
+                        {
+                            await reader.DisposeAsync();
                         }
                     }
-
-                    if (exceptions.Count > 0)
+                    finally
                     {
-                        throw new AggregateException(exceptions);
+                        await batch.DisposeAsync();
                     }
                 }
 
