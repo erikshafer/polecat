@@ -1,6 +1,7 @@
 using System.Text;
 using Microsoft.Data.SqlClient;
 using Polly;
+using Polecat.Events.TestSupport;
 using Polecat.Internal;
 using Polecat.Metadata;
 using Polecat.Schema.Identity.Sequences;
@@ -428,5 +429,17 @@ public class AdvancedOperations
                 await cmd.ExecuteNonQueryAsync(ct);
             }
         }, token);
+    }
+
+    /// <summary>
+    ///     Run a projection scenario test that appends events and asserts against projected documents.
+    ///     Automatically cleans data, starts the async daemon if needed, and waits for projections
+    ///     to catch up before running assertions.
+    /// </summary>
+    public Task EventProjectionScenario(Action<ProjectionScenario> configuration, CancellationToken ct = default)
+    {
+        var scenario = new ProjectionScenario(_store);
+        configuration(scenario);
+        return scenario.Execute(ct);
     }
 }
