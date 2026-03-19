@@ -82,7 +82,7 @@ These patterns are compatible with libraries like [Vogen](https://github.com/Ste
 ### Supported Inner Types
 
 | Wrapper Pattern | ID Generation |
-|---|---|
+| --- | --- |
 | `record struct InvoiceId(Guid Value)` | Auto-assigned sequential Guid |
 | `record struct OrderItemId(int Value)` | HiLo sequence |
 | `record struct IssueId(long Value)` | HiLo sequence |

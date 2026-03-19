@@ -84,7 +84,7 @@ The daemon uses Polly resilience pipelines for error handling. See [Resiliency P
 
 ## Architecture
 
-```
+```text
 pc_events
   │ (Polling)
   ▼
