@@ -12,6 +12,26 @@ public class archived_stream_partitioning : IntegrationContext
 
     public override async Task InitializeAsync()
     {
+        // Drop the schema first to ensure a clean slate — the migration uses
+        // IF OBJECT_ID IS NULL which won't recreate an existing table with
+        // the partition ON clause.
+        var conn = await OpenConnectionAsync();
+        try
+        {
+            await using var dropCmd = new SqlCommand("""
+                IF EXISTS (SELECT 1 FROM sys.schemas WHERE name = 'archived_part')
+                BEGIN
+                    DECLARE @sql NVARCHAR(MAX) = '';
+                    SELECT @sql = @sql + 'DROP TABLE IF EXISTS [archived_part].' + QUOTENAME(name) + ';'
+                    FROM sys.tables WHERE schema_id = SCHEMA_ID('archived_part');
+                    EXEC sp_executesql @sql;
+                    DROP SCHEMA IF EXISTS [archived_part];
+                END
+                """, conn);
+            await dropCmd.ExecuteNonQueryAsync();
+        }
+        catch { /* ignore if schema doesn't exist */ }
+
         await StoreOptions(opts =>
         {
             opts.DatabaseSchemaName = "archived_part";
@@ -43,7 +63,7 @@ public class archived_stream_partitioning : IntegrationContext
         var psCount = (int)(await psCmd.ExecuteScalarAsync())!;
         psCount.ShouldBeGreaterThan(0);
 
-        // Verify the table has 2 partitions (is_archived=0 and is_archived=1)
+        // Verify the table in our schema has 2 partitions
         await using var partCmd = new SqlCommand("""
             SELECT COUNT(*)
             FROM sys.partitions p
@@ -52,6 +72,8 @@ public class archived_stream_partitioning : IntegrationContext
             WHERE s.name = 'archived_part' AND o.name = 'pc_events' AND p.index_id <= 1
             """, conn);
         var partitionCount = (int)(await partCmd.ExecuteScalarAsync())!;
+        // With 1 boundary value (is_archived=1), we get 2 partitions:
+        // Partition 1: is_archived < 1 (active), Partition 2: is_archived >= 1 (archived)
         partitionCount.ShouldBe(2);
     }
 

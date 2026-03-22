@@ -1,6 +1,7 @@
 using JasperFx.Events;
 using Weasel.SqlServer;
 using Weasel.SqlServer.Tables;
+using Weasel.SqlServer.Tables.Partitioning;
 
 namespace Polecat.Events.Schema;
 
@@ -10,7 +11,6 @@ namespace Polecat.Events.Schema;
 internal class EventsTable : Table
 {
     public const string TableName = "pc_events";
-    internal bool UseArchivedPartitioning { get; set; }
 
     public EventsTable(EventGraph events)
         : base(new SqlServerObjectName(events.DatabaseSchemaName, TableName))
@@ -75,7 +75,12 @@ internal class EventsTable : Table
         {
             // SQL Server requires the partition column to be in the clustered index (PK).
             archiveColumn.AsPrimaryKey();
-            UseArchivedPartitioning = true;
+
+            // Use Weasel.SqlServer 8.10.0's proper partitioning API which generates
+            // CREATE PARTITION FUNCTION + CREATE PARTITION SCHEME + ON clause DDL.
+            var partitioning = new RangePartitioning("is_archived", "bit");
+            partitioning.AddBoundary(1);
+            SqlServerPartitioning = partitioning;
         }
 
         // Unique constraint: one version per stream (with tenant for conjoined)
