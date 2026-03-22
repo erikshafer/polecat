@@ -73,6 +73,14 @@ public class EventGraph : EventRegistry, IAggregationSourceFactory<IQuerySession
     /// </summary>
     public bool UseIdentityMapForAggregates { get; set; }
 
+    /// <summary>
+    ///     Enable SQL Server table partitioning on the pc_events table by the
+    ///     is_archived column. This separates archived events into a different
+    ///     partition for improved query performance when aggressively archiving
+    ///     event streams.
+    /// </summary>
+    public bool UseArchivedStreamPartitioning { get; set; }
+
     internal string StreamsTableName => $"[{DatabaseSchemaName}].[pc_streams]";
     internal string EventsTableName => $"[{DatabaseSchemaName}].[pc_events]";
     internal string ProgressionTableName => $"[{DatabaseSchemaName}].[pc_event_progression]";

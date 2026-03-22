@@ -10,6 +10,7 @@ namespace Polecat.Events.Schema;
 internal class EventsTable : Table
 {
     public const string TableName = "pc_events";
+    internal bool UseArchivedPartitioning { get; set; }
 
     public EventsTable(EventGraph events)
         : base(new SqlServerObjectName(events.DatabaseSchemaName, TableName))
@@ -65,15 +66,31 @@ internal class EventsTable : Table
         }
 
         // Archive flag
-        AddColumn("is_archived", "bit").NotNull().DefaultValue(0);
+        var archiveColumn = AddColumn("is_archived", "bit").NotNull().DefaultValue(0);
+
+        // Apply SQL Server RANGE partitioning on is_archived if enabled.
+        // This separates active (is_archived=0) and archived (is_archived=1)
+        // events into different partitions for improved query performance.
+        if (events.UseArchivedStreamPartitioning)
+        {
+            // SQL Server requires the partition column to be in the clustered index (PK).
+            archiveColumn.AsPrimaryKey();
+            UseArchivedPartitioning = true;
+        }
 
         // Unique constraint: one version per stream (with tenant for conjoined)
+        // When using archived stream partitioning, SQL Server requires the partition
+        // column (is_archived) to be included in all unique indexes.
         if (events.TenancyStyle == TenancyStyle.Conjoined)
         {
+            var uniqueColumns = events.UseArchivedStreamPartitioning
+                ? new[] { "tenant_id", "stream_id", "version", "is_archived" }
+                : new[] { "tenant_id", "stream_id", "version" };
+
             Indexes.Add(new IndexDefinition("ix_pc_events_stream_and_version")
             {
                 IsUnique = true,
-                Columns = ["tenant_id", "stream_id", "version"]
+                Columns = uniqueColumns
             });
 
             // NOTE: Composite FK to pc_streams is intentionally omitted for conjoined tenancy.
@@ -84,10 +101,14 @@ internal class EventsTable : Table
         }
         else
         {
+            var uniqueCols = events.UseArchivedStreamPartitioning
+                ? new[] { "stream_id", "version", "is_archived" }
+                : new[] { "stream_id", "version" };
+
             Indexes.Add(new IndexDefinition("ix_pc_events_stream_and_version")
             {
                 IsUnique = true,
-                Columns = ["stream_id", "version"]
+                Columns = uniqueCols
             });
 
             // Foreign key to streams table

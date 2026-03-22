@@ -25,9 +25,24 @@ internal class EventStoreFeatureSchema : FeatureSchemaBase
 
     protected override IEnumerable<ISchemaObject> schemaObjects()
     {
+        // Partition function/scheme must exist before the events table when partitioning is enabled
+        if (_events.UseArchivedStreamPartitioning)
+        {
+            yield return new ArchivedStreamPartitionDdl(_events);
+        }
+
         // Streams table must be created first (events table references it via FK)
         yield return _events.BuildStreamsTable();
-        yield return _events.BuildEventsTable();
+
+        var eventsTable = _events.BuildEventsTable();
+        if (_events.UseArchivedStreamPartitioning && eventsTable is EventsTable et && et.UseArchivedPartitioning)
+        {
+            yield return new PartitionedEventsTableWrapper(et);
+        }
+        else
+        {
+            yield return eventsTable;
+        }
         yield return _events.BuildEventProgressionTable();
 
         // Tag tables for DCB support
