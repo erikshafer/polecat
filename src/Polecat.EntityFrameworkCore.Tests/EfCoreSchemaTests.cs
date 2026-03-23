@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Weasel.EntityFrameworkCore;
 using Weasel.SqlServer.Tables;
 
 namespace Polecat.EntityFrameworkCore.Tests;
@@ -176,5 +177,51 @@ public class EfCoreSchemaTests
         entityTable.ForeignKeys.Count.ShouldBeGreaterThan(0);
         entityTable.ForeignKeys.ShouldContain(fk =>
             fk.LinkedTable.Name == "entity_type");
+    }
+
+    [Fact]
+    public void should_return_entity_types_in_fk_dependency_order()
+    {
+        // Issue https://github.com/JasperFx/marten/issues/4180:
+        // GetEntityTypesForMigration should return entity types sorted
+        // so that referenced tables come before referencing tables.
+        var builder = new DbContextOptionsBuilder<SeparateSchemaDbContext>();
+        builder.UseSqlServer("Server=localhost");
+
+        using var dbContext = new SeparateSchemaDbContext(builder.Options);
+
+        var entityTypes = DbContextExtensions.GetEntityTypesForMigration(dbContext);
+        var names = entityTypes.Select(e => e.GetTableName()).ToList();
+
+        // entity_type must come before entity because entity has a FK to entity_type
+        var entityTypeIndex = names.IndexOf("entity_type");
+        var entityIndex = names.IndexOf("entity");
+
+        entityTypeIndex.ShouldBeGreaterThanOrEqualTo(0);
+        entityIndex.ShouldBeGreaterThanOrEqualTo(0);
+        entityTypeIndex.ShouldBeLessThan(entityIndex,
+            "entity_type should come before entity due to FK dependency (Marten issue #4180)");
+    }
+
+    [Fact]
+    public void should_register_tables_in_fk_dependency_order()
+    {
+        // Verify the tables are registered in dependency order via AddEntityTablesFromDbContext
+        var store = DocumentStore.For(opts =>
+        {
+            opts.ConnectionString = ConnectionSource.ConnectionString;
+            opts.AddEntityTablesFromDbContext<SeparateSchemaDbContext>();
+        });
+
+        var tables = store.Options.ExtendedSchemaObjects.OfType<Table>().ToList();
+        var tableNames = tables.Select(t => t.Identifier.Name).ToList();
+
+        var entityTypeIndex = tableNames.IndexOf("entity_type");
+        var entityIndex = tableNames.IndexOf("entity");
+
+        entityTypeIndex.ShouldBeGreaterThanOrEqualTo(0);
+        entityIndex.ShouldBeGreaterThanOrEqualTo(0);
+        entityTypeIndex.ShouldBeLessThan(entityIndex,
+            "entity_type table should be registered before entity table due to FK dependency");
     }
 }
