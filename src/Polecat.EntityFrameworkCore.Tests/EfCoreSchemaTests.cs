@@ -224,4 +224,25 @@ public class EfCoreSchemaTests
         entityTypeIndex.ShouldBeLessThan(entityIndex,
             "entity_type table should be registered before entity table due to FK dependency");
     }
+
+    [Fact]
+    public void should_have_correct_fk_schema_with_explicit_schema()
+    {
+        // Related to Marten issue #4192: FK LinkedTable references should use the
+        // correct schema. In Polecat's case (SQL Server), tables with an explicit
+        // schema should have FKs pointing to the same explicit schema.
+        var store = DocumentStore.For(opts =>
+        {
+            opts.ConnectionString = ConnectionSource.ConnectionString;
+            opts.AddEntityTablesFromDbContext<SeparateSchemaDbContext>();
+        });
+
+        var entityTable = store.Options.ExtendedSchemaObjects.OfType<Table>()
+            .First(t => t.Identifier.Name == "entity");
+
+        var entityFk = entityTable.ForeignKeys.FirstOrDefault();
+        entityFk.ShouldNotBeNull("Entity should have a FK to EntityType");
+        entityFk.LinkedTable!.Schema.ShouldBe(SeparateSchemaDbContext.EfSchema,
+            "FK LinkedTable should reference the correct explicit schema");
+    }
 }
