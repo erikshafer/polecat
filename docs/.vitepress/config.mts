@@ -121,6 +121,7 @@ const config: UserConfig<DefaultTheme.Config> = {
                 { text: 'Asynchronous Projections', link: '/events/projections/async-daemon' },
                 { text: 'EF Core Projections', link: '/events/projections/efcore' },
                 { text: 'Ancillary Stores in Projections', link: '/events/projections/ancillary-stores' },
+                { text: 'ProjectLatest — Include Pending Events', link: '/events/projections/project-latest' },
               ]
             },
             {
