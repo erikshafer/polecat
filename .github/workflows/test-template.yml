@@ -6,10 +6,10 @@ on:
       TEST_PROJECT_PATH:
         required: true
         type: string
-      USE_AZURE_SQL_EDGE:
+      STORAGE_TYPE:
         required: false
-        type: boolean
-        default: false
+        type: string
+        default: "default"
       TEST_FILTERS:
         required: false
         type: string
@@ -37,7 +37,7 @@ jobs:
 
       - name: Start SQL Server
         run: |
-          if [ "${{ inputs.USE_AZURE_SQL_EDGE }}" = 'true' ]; then
+          if [ "${{ inputs.STORAGE_TYPE }}" = 'edge' ]; then
             docker compose -f docker-compose.yml -f docker-compose.azure-sql-edge.yml up -d
           else
             docker compose up -d

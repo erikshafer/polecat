@@ -2,7 +2,6 @@ using Microsoft.Data.SqlClient;
 using Polecat.Projections;
 using Polecat.Tests.Harness;
 using Polecat.Tests.Projections;
-using Polecat.TestUtils;
 using Shouldly;
 
 namespace Polecat.Tests.Events;

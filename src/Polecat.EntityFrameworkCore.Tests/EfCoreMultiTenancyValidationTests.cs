@@ -1,7 +1,6 @@
 using JasperFx.Events.Projections;
 
 using JasperFx;
-using Polecat.TestUtils;
 
 namespace Polecat.EntityFrameworkCore.Tests;
 

@@ -3,7 +3,6 @@ using JasperFx.Events;
 using JasperFx.Events.Projections;
 using Polecat.Projections;
 using Polecat.Tests.Harness;
-using Polecat.TestUtils;
 using StronglyTypedIds;
 
 namespace Polecat.Tests.Projections;

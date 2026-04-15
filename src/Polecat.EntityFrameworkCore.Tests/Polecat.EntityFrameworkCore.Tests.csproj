@@ -17,6 +17,7 @@
         <Using Include="Xunit" />
         <Using Include="Shouldly" />
         <Using Include="JasperFx" />
+        <Using Include="Polecat.TestUtils" />
     </ItemGroup>
 
     <ItemGroup>

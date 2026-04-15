@@ -2,7 +2,6 @@ using JasperFx.Events.Daemon;
 using JasperFx.Events.Projections;
 using Polecat.Subscriptions;
 using Polecat.Tests.Harness;
-using Polecat.TestUtils;
 
 namespace Polecat.Tests.Subscriptions;
 

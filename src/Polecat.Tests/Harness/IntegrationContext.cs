@@ -1,7 +1,6 @@
 using JasperFx;
 using Microsoft.Data.SqlClient;
 using Polecat.Storage;
-using Polecat.TestUtils;
 
 namespace Polecat.Tests.Harness;
 

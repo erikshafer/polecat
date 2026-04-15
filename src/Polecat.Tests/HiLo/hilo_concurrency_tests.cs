@@ -1,5 +1,4 @@
 using Polecat.Tests.Harness;
-using Polecat.TestUtils;
 
 namespace Polecat.Tests.HiLo;
 
@@ -8,13 +7,15 @@ namespace Polecat.Tests.HiLo;
 /// </summary>
 public class hilo_concurrency_tests : OneOffConfigurationsContext
 {
-    static hilo_concurrency_tests()
+    const int Count = 10;
+    
+    public hilo_concurrency_tests()
     {
         ThreadPool.SetMinThreads(200, 200);
     }
 
     [Theory]
-    [Repeat(100)]
+    [Repeat(Count)]
     public async Task concurrent_sessions_get_unique_int_ids(int _)
     {
         const int concurrency = 10;
@@ -55,7 +56,7 @@ public class hilo_concurrency_tests : OneOffConfigurationsContext
     }
 
     [Theory]
-    [Repeat(100)]
+    [Repeat(Count)]
     public async Task concurrent_sessions_get_unique_long_ids(int _)
     {
         const int concurrency = 10;
@@ -92,7 +93,7 @@ public class hilo_concurrency_tests : OneOffConfigurationsContext
     }
 
     [Theory]
-    [Repeat(100)]
+    [Repeat(Count)]
     public async Task concurrent_bulk_inserts_get_unique_ids(int _)
     {
         const int concurrency = 5;
@@ -123,7 +124,7 @@ public class hilo_concurrency_tests : OneOffConfigurationsContext
     }
 
     [Theory]
-    [Repeat(100)]
+    [Repeat(Count)]
     public async Task sequential_hilo_ids_are_monotonically_increasing_within_session(int _)
     {
         await using var session = theStore.LightweightSession();

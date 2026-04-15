@@ -3,7 +3,6 @@ using JasperFx.Events.Projections;
 using Microsoft.Data.SqlClient;
 using Polecat.Events.Daemon;
 using Polecat.Tests.Harness;
-using Polecat.TestUtils;
 
 namespace Polecat.Tests.Daemon;
 

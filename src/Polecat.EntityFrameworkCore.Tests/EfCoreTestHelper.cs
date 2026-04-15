@@ -1,7 +1,6 @@
 using JasperFx.Events.Projections;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
-using Polecat.TestUtils;
 
 namespace Polecat.EntityFrameworkCore.Tests;
 

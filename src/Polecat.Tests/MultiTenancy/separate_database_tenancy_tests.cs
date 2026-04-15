@@ -4,7 +4,6 @@ using Microsoft.Data.SqlClient;
 using Polecat.Exceptions;
 using Polecat.Storage;
 using Polecat.Tests.Harness;
-using Polecat.TestUtils;
 
 namespace Polecat.Tests.MultiTenancy;
 
