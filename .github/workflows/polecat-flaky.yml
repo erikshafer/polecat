@@ -1,7 +1,8 @@
 name: polecat-flaky
 
 on:
-  push: # see test-template.yml for details on when this runs
+  push:
+    branches: [ main ]
   pull_request:
     branches: [ main ]
   workflow_dispatch:
