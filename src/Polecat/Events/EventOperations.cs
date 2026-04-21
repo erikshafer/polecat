@@ -186,6 +186,34 @@ internal class EventOperations : QueryEventStore, IEventOperations
         return await FetchForWritingInternal<T>(key, true, null, cancellation);
     }
 
+    public async ValueTask<T?> ProjectLatest<T>(Guid id, CancellationToken cancellation = default)
+        where T : class, new()
+    {
+        var snapshot = await _sessionBase.Events.FetchLatest<T>(id, cancellation);
+
+        if (_workTracker.TryFindStream(id, out var stream) && stream!.Events.Count > 0)
+        {
+            var aggregator = _sessionBase.Options.Projections.AggregatorFor<T>();
+            snapshot = await aggregator.BuildAsync(stream.Events, _sessionBase, snapshot, cancellation);
+        }
+
+        return snapshot;
+    }
+
+    public async ValueTask<T?> ProjectLatest<T>(string key, CancellationToken cancellation = default)
+        where T : class, new()
+    {
+        var snapshot = await _sessionBase.Events.FetchLatest<T>(key, cancellation);
+
+        if (_workTracker.TryFindStream(key, out var stream) && stream!.Events.Count > 0)
+        {
+            var aggregator = _sessionBase.Options.Projections.AggregatorFor<T>();
+            snapshot = await aggregator.BuildAsync(stream.Events, _sessionBase, snapshot, cancellation);
+        }
+
+        return snapshot;
+    }
+
     public async Task WriteToAggregate<T>(Guid id, Action<IEventStream<T>> writing, CancellationToken cancellation = default)
         where T : class, new()
     {

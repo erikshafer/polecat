@@ -93,6 +93,18 @@ public interface IEventOperations : IQueryEventStore
     Task<IEventStream<T>> FetchForExclusiveWriting<T>(string key, CancellationToken cancellation = default) where T : class, new();
 
     /// <summary>
+    ///     Fetch the projected aggregate T by id, including any events appended
+    ///     in this session that have not yet been committed.
+    /// </summary>
+    ValueTask<T?> ProjectLatest<T>(Guid id, CancellationToken cancellation = default) where T : class, new();
+
+    /// <summary>
+    ///     Fetch the projected aggregate T by id, including any events appended
+    ///     in this session that have not yet been committed.
+    /// </summary>
+    ValueTask<T?> ProjectLatest<T>(string key, CancellationToken cancellation = default) where T : class, new();
+
+    /// <summary>
     ///     Fetch the aggregate, apply events via callback, and save changes in one step.
     /// </summary>
     Task WriteToAggregate<T>(Guid id, Action<IEventStream<T>> writing, CancellationToken cancellation = default) where T : class, new();
