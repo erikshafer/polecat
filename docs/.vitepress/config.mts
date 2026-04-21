@@ -93,6 +93,7 @@ const config: UserConfig<DefaultTheme.Config> = {
             { text: 'Optimistic Concurrency', link: '/documents/concurrency' },
             { text: 'Partial Updates/Patching', link: '/documents/partial-updates-patching' },
             { text: 'Bulk Insert', link: '/documents/bulk-insert' },
+            { text: 'ASP.NET Core Integration', link: '/documents/aspnetcore' },
           ]
         },
         {
