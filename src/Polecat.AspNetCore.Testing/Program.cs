@@ -17,6 +17,8 @@ builder.Services.AddPolecat(opts =>
     opts.UseNativeJsonType = ConnectionSource.SupportsNativeJson;
     opts.AutoCreateSchemaObjects = AutoCreate.All;
     opts.Events.StreamIdentity = StreamIdentity.AsGuid;
+    opts.Events.EnableCorrelationId = true;
+    opts.Events.EnableCausationId = true;
 });
 
 var app = builder.Build();

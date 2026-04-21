@@ -13,8 +13,9 @@ public class streaming_result_types_tests : IAsyncLifetime
     {
         _host = await AlbaHost.For<Program>();
 
-        // Apply schema
-        var store = _host.Services.GetRequiredService<IDocumentStore>();
+        // Ensure schema is created and clean documents for a fresh start
+        var store = (DocumentStore)_host.Services.GetRequiredService<IDocumentStore>();
+        await store.Database.ApplyAllConfiguredChangesToDatabaseAsync();
         await store.Advanced.CleanAllDocumentsAsync();
     }
 
