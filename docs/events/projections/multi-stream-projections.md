@@ -87,6 +87,16 @@ The key technique is using a composite identity that combines the stream ID with
 <!-- snippet: sample_polecat_monthly_account_activity_projection -->
 <!-- endSnippet -->
 
+Register the projection as inline (for immediate consistency) or async (for eventual consistency):
+
+```cs
+// Inline — projected immediately during SaveChangesAsync
+opts.Projections.Add<MonthlyAccountActivityProjection>(ProjectionLifecycle.Inline);
+
+// Async — projected by the async daemon in the background
+opts.Projections.Add<MonthlyAccountActivityProjection>(ProjectionLifecycle.Async);
+```
+
 Each account stream's events are routed to monthly documents automatically. Querying is straightforward:
 
 ```cs
@@ -99,6 +109,10 @@ var monthlies = await session.Query<MonthlyAccountActivity>()
 // Get a specific month
 var jan = await session.LoadAsync<MonthlyAccountActivity>($"{accountId}:2026-01");
 ```
+
+::: tip
+When using async projections, make sure to start the async daemon — see [Asynchronous Projections](/events/projections/async-daemon) for details.
+:::
 
 ## ID Types
 
