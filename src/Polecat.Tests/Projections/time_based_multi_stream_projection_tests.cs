@@ -125,6 +125,47 @@ public class time_based_multi_stream_projection_tests : IntegrationContext
     }
 
     [Fact]
+    public async Task monthly_projection_works_with_async_daemon()
+    {
+        await StoreOptions(opts =>
+        {
+            opts.Projections.Add<MonthlyAccountActivityProjection>(ProjectionLifecycle.Async);
+        });
+
+        var accountId = Guid.NewGuid();
+
+        await using (var session = theStore.LightweightSession())
+        {
+            session.Events.StartStream(accountId, new AccountOpened("Checking"));
+            await session.SaveChangesAsync();
+        }
+
+        await using (var session = theStore.LightweightSession())
+        {
+            session.Events.Append(accountId,
+                new AccountDebited(75m, "Gas"),
+                new AccountCredited(3000m, "Paycheck"));
+            await session.SaveChangesAsync();
+        }
+
+        // Run the async daemon to catch up
+        using var daemon = (IProjectionDaemon)await theStore.BuildProjectionDaemonAsync();
+        await daemon.StartAllAsync();
+        await daemon.CatchUpAsync(TimeSpan.FromSeconds(30), CancellationToken.None);
+        await daemon.StopAllAsync();
+
+        var currentMonth = DateTime.UtcNow.ToString("yyyy-MM");
+
+        await using var query = theStore.QuerySession();
+        var activity = await query.LoadAsync<MonthlyAccountActivity>($"{accountId}:{currentMonth}");
+
+        activity.ShouldNotBeNull();
+        activity.TotalDebits.ShouldBe(75m);
+        activity.TotalCredits.ShouldBe(3000m);
+        activity.TransactionCount.ShouldBe(2);
+    }
+
+    [Fact]
     public async Task separate_accounts_get_separate_monthly_documents()
     {
         var store = await CreateStoreWithMonthlyProjection();
