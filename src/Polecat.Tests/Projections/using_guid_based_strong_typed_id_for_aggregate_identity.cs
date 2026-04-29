@@ -84,7 +84,7 @@ public class using_guid_based_strong_typed_id_for_aggregate_identity : Integrati
         await StoreOptions(opts =>
         {
             opts.DatabaseSchemaName = "guid_stid_inline";
-            opts.Projections.Snapshot<Payment>(SnapshotLifecycle.Inline);
+            opts.Projections.Add<SingleStreamProjection<Payment, Guid>>(ProjectionLifecycle.Inline);
         });
 
         var streamId = Guid.NewGuid();
@@ -157,7 +157,7 @@ public class using_guid_based_strong_typed_id_for_aggregate_identity : Integrati
         await StoreOptions(opts =>
         {
             opts.DatabaseSchemaName = "guid_stid_async";
-            opts.Projections.Snapshot<Payment>(SnapshotLifecycle.Async);
+            opts.Projections.Add<SingleStreamProjection<Payment, Guid>>(ProjectionLifecycle.Async);
         });
 
         var streamId = Guid.NewGuid();
