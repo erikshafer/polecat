@@ -1,63 +1,95 @@
-# Event Snapshots
+# Snapshot Projections
 
-Polecat can store aggregate snapshots alongside stream metadata to optimize event replay performance.
+`Projections.Snapshot<T>()` is a convenient shortcut for registering a self-aggregating
+projection: it builds and registers a [`SingleStreamProjection<T, TId>`](/events/projections/single-stream-projections)
+internally, with the identity type resolved automatically from the document's `Id` property.
 
-## How Snapshots Work
+::: tip How it works under the hood
+`Snapshot<T>()` is purely a registration shortcut — it does **not** introduce a separate
+"snapshot" storage path. Internally it builds a `SingleStreamProjection<T, TId>` against the
+appropriate identity type and registers it through the same projection pipeline as any other
+projection. The aggregate is persisted to the document table for type `T` (the standard
+`pc_doc_{type}` table), not to a special snapshot column on `pc_streams`.
 
-Instead of replaying all events from the beginning of a stream, Polecat can:
+This mirrors Marten's `Snapshot<T>()` API exactly so the two ecosystems stay aligned.
+:::
 
-1. Load the latest snapshot from the `pc_streams` table
-2. Only replay events that occurred after the snapshot version
-3. Return the fully hydrated aggregate
+## Registration
 
-This significantly reduces replay time for streams with many events.
-
-## Inline Snapshots
-
-Register a snapshot that updates in the same transaction as event appending:
+The aggregate type **must be self-aggregating** — i.e. it must have its own static
+`Create` and instance `Apply` methods (or implement the appropriate aggregation conventions).
 
 ```cs
+public class QuestParty
+{
+    public Guid Id { get; set; }
+    public string Name { get; set; } = "";
+    public List<string> Members { get; set; } = new();
+
+    public static QuestParty Create(QuestStarted e) => new() { Name = e.Name };
+    public void Apply(MembersJoined e) => Members.AddRange(e.Members);
+}
+
 var store = DocumentStore.For(opts =>
 {
     opts.Connection("...");
+
+    // Inline — snapshot updated in the same transaction as the events
     opts.Projections.Snapshot<QuestParty>(SnapshotLifecycle.Inline);
 });
 ```
 
-When events are appended, the projection runs inline and the resulting aggregate state is stored as a JSON snapshot in the `pc_streams.snapshot` column.
+If you need to subclass `SingleStreamProjection<TDoc, TId>` to override behavior, register
+it directly via `opts.Projections.Add<MyProjection>(ProjectionLifecycle.Inline)` instead.
 
-## Snapshot Storage
-
-Snapshots are stored directly in the `pc_streams` table:
-
-| Column | Type | Description |
-| :--- | :--- | :--- |
-| `snapshot` | `json` | Serialized aggregate state |
-| `snapshot_version` | `int` | Version at which snapshot was taken |
-
-## Using Snapshots with AggregateStreamAsync
-
-When snapshots are available, `AggregateStreamAsync` automatically uses them:
+## Lifecycles
 
 ```cs
-var party = await session.Events.AggregateStreamAsync<QuestParty>(streamId);
-// If a snapshot exists at version 50 and stream is at version 75,
-// only events 51-75 are replayed on top of the snapshot
-```
+// Updated in the same transaction as the appended events
+opts.Projections.Snapshot<QuestParty>(SnapshotLifecycle.Inline);
 
-### Snapshot Behavior
-
-- If no snapshot exists, all events are replayed from the beginning
-- If the snapshot version matches the stream version, the snapshot is returned directly
-- If the snapshot version is less than the requested version, events after the snapshot are replayed
-- If a version cap is specified that's less than the snapshot version, the snapshot is skipped and all events are replayed
-
-## Async Snapshots
-
-Snapshots can also be updated by the async daemon:
-
-```cs
+// Updated asynchronously by the async projection daemon
 opts.Projections.Snapshot<QuestParty>(SnapshotLifecycle.Async);
 ```
 
-This updates snapshots in the background as the async daemon processes events.
+`SnapshotLifecycle.Live` is intentionally not supported — for live aggregation, use
+[`AggregateStreamAsync<T>()`](/events/projections/live-aggregates) directly without registering
+a projection.
+
+## Reading the Aggregate
+
+Because `Snapshot<T>()` registers a regular `SingleStreamProjection`, you read the result
+the same way you would for any other projected document:
+
+```cs
+await using var session = store.QuerySession();
+
+// Loads from the projected document table (pc_doc_questparty)
+var party = await session.LoadAsync<QuestParty>(streamId);
+
+// Or fetch the latest version from the event store
+var latest = await session.Events.FetchLatest<QuestParty>(streamId);
+```
+
+## Snapshot in a Composite Projection
+
+Composite projections support the same shortcut via `composite.Snapshot<T>()`:
+
+```cs
+opts.Projections.CompositeProjectionFor("UserLifecycle", composite =>
+{
+    composite.Snapshot<User>();          // stage 1 (default)
+    composite.Snapshot<UserStats>(2);    // stage 2
+});
+```
+
+Inside a composite projection, snapshots always run as `Async` — composite projections are
+themselves async-only.
+
+## Choosing Between Snapshot and Add
+
+- Use **`Snapshot<T>()`** when `T` is a self-aggregating aggregate type with conventional
+  `Create`/`Apply` methods. This is the simplest registration.
+- Use **`Add<TProjection>(...)`** when you have a dedicated `SingleStreamProjection<TDoc, TId>`
+  subclass that overrides projection behavior, or when registering any other projection type
+  (multi-stream, event projections, flat tables, etc).

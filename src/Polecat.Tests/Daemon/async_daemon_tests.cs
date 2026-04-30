@@ -11,6 +11,7 @@ public class async_daemon_tests : OneOffConfigurationsContext
     {
         ConfigureStore(opts =>
         {
+            opts.DatabaseSchemaName = "async_daemon";
             opts.Projections.Snapshot<QuestParty>(SnapshotLifecycle.Async);
         });
         await theDatabase.ApplyAllConfiguredChangesToDatabaseAsync();
@@ -87,7 +88,7 @@ public class async_daemon_tests : OneOffConfigurationsContext
         var highestSeq = await store.Database.FetchHighestEventSequenceNumber(CancellationToken.None);
         var allProgress = await store.Database.AllProjectionProgress(CancellationToken.None);
 
-        // Filter out HighWaterMark — look for projection-specific progress
+        // Filter out HighWaterMark ï¿½ look for projection-specific progress
         var projectionProgress = allProgress
             .Where(p => p.ShardName != "HighWaterMark")
             .ToList();

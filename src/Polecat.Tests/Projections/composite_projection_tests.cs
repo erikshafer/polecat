@@ -1,3 +1,4 @@
+using Polecat.Projections;
 using Polecat.Tests.Harness;
 
 namespace Polecat.Tests.Projections;
