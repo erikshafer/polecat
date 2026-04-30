@@ -1,3 +1,4 @@
+using JasperFx.Core.Reflection;
 using JasperFx.Events;
 using JasperFx.Events.Aggregation;
 using JasperFx.Events.Projections;
@@ -6,6 +7,7 @@ using JasperFx.Events.Subscriptions;
 using Polecat.Events;
 using Polecat.Events.Projections;
 using Polecat.Projections.Flattened;
+using Polecat.Storage;
 using Polecat.Subscriptions;
 
 namespace Polecat.Projections;
@@ -53,6 +55,45 @@ public class PolecatProjectionOptions
         {
             flatTable.Compile(_events);
         }
+    }
+
+    /// <summary>
+    ///     Register a snapshot (self-aggregating) projection for the document type
+    ///     <typeparamref name="T"/>. Behaves identically to Marten's
+    ///     <c>Projections.Snapshot&lt;T&gt;()</c> — under the hood it builds and registers a
+    ///     <see cref="SingleStreamProjection{TDoc, TId}"/> with the appropriate identity type
+    ///     resolved from <typeparamref name="T"/>'s <c>Id</c> property.
+    /// </summary>
+    /// <typeparam name="T">
+    ///     The aggregate document type. Must be self-aggregating — i.e. it has its own
+    ///     <c>Apply</c>/<c>Create</c> methods. To register a custom <see cref="SingleStreamProjection{TDoc, TId}"/>
+    ///     subclass, use <see cref="ProjectionGraph{TProjection,TOperations,TQuerySession}.Add{T}"/> instead.
+    /// </typeparam>
+    /// <param name="lifecycle">
+    ///     The snapshot lifecycle: <see cref="SnapshotLifecycle.Inline"/> updates the snapshot in the
+    ///     same transaction as the events; <see cref="SnapshotLifecycle.Async"/> updates via the async daemon.
+    /// </param>
+    public void Snapshot<T>(SnapshotLifecycle lifecycle) where T : notnull
+    {
+        AddSnapshotProjection<T>(lifecycle.ToProjectionLifecycle());
+    }
+
+    private void AddSnapshotProjection<T>(ProjectionLifecycle lifecycle) where T : notnull
+    {
+        if (typeof(T).CanBeCastTo<ProjectionBase>())
+        {
+            throw new InvalidOperationException(
+                $"This registration mechanism can only be used for an aggregate type that is 'self-aggregating'. " +
+                $"Please use the Projections.Add() API instead to register {typeof(T).FullNameInCode()}.");
+        }
+
+        // Resolve the Id type the same way DocumentMapping does
+        var identityType = new DocumentMapping(typeof(T), _storeOptions!).IdType;
+        var source = typeof(SingleStreamProjection<,>).CloseAndBuildAs<ProjectionBase>(typeof(T), identityType);
+        source.Lifecycle = lifecycle;
+        source.AssembleAndAssertValidity();
+
+        Add((IProjectionSource<IDocumentSession, IQuerySession>)source, lifecycle);
     }
 
     /// <summary>

@@ -12,7 +12,7 @@ public class async_daemon_tests : OneOffConfigurationsContext
         ConfigureStore(opts =>
         {
             opts.DatabaseSchemaName = "async_daemon";
-            opts.Projections.Add<SingleStreamProjection<QuestParty, Guid>>(ProjectionLifecycle.Async);
+            opts.Projections.Snapshot<QuestParty>(SnapshotLifecycle.Async);
         });
         await theDatabase.ApplyAllConfiguredChangesToDatabaseAsync();
 
