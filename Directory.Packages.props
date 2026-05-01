@@ -33,6 +33,9 @@
 
         <!-- Source generators -->
         <PackageVersion Include="JasperFx.Events.SourceGenerator" Version="1.4.0" />
+
+        <!-- Build automation -->
+        <PackageVersion Include="Nuke.Common" Version="9.0.4" />
     </ItemGroup>
 
     <!-- EF Core -->
